@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zsh
 PKG_VERSION:=5.9.2
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@SF/zsh
@@ -102,9 +102,11 @@ define Package/zsh/postinst
 grep zsh $${IPKG_INSTROOT}/etc/shells || \
 	echo "/usr/bin/zsh" >> $${IPKG_INSTROOT}/etc/shells
 
-# Backwards compatibility
-if [ -e /bin/zsh ] && { [ ! -L /bin/zsh ] || [ "$(readlink -fn $${IPKG_INSTROOT}/bin/zsh)" != "../$(CONFIGURE_PREFIX)/bin/zsh" ]; }; then
-	ln -fs "../$(CONFIGURE_PREFIX)/bin/zsh" "$${IPKG_INSTROOT}/bin/zsh"
+# Backwards compatibility for an existing /bin/zsh. In merged-/usr images,
+# /bin already points to /usr/bin, so this would replace zsh with a self-link.
+if [ ! -L "$${IPKG_INSTROOT}/bin" ] && \
+	{ [ -e "$${IPKG_INSTROOT}/bin/zsh" ] || [ -L "$${IPKG_INSTROOT}/bin/zsh" ]; }; then
+	ln -fs "..$(CONFIGURE_PREFIX)/bin/zsh" "$${IPKG_INSTROOT}/bin/zsh"
 fi
 endef
 
