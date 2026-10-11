@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=glib2
 PKG_VERSION:=2.88.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=glib-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNOME/glib/$(basename $(PKG_VERSION))
@@ -67,6 +67,12 @@ define Package/glib2-gio
 $(call Package/glib2/default)
   TITLE:=GLib 2.0 gio library
   DEPENDS:=+glib2-core +glib2-gobject +glib2-gmodule +zlib +libffi
+endef
+
+define Package/libgirepository2
+$(call Package/glib2/default)
+  TITLE:=GLib introspection runtime library
+  DEPENDS:=+glib2-gio
 endef
 
 define Package/glib2
@@ -206,6 +212,11 @@ define Package/glib2-gio/install
 		$(1)/usr/lib
 endef
 
+define Package/libgirepository2/install
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libgirepository-2.0.so* $(1)/usr/lib/
+endef
+
 define Package/glib2/install
 	:
 endef
@@ -217,3 +228,19 @@ $(eval $(call BuildPackage,glib2-gthread))
 $(eval $(call BuildPackage,glib2-gobject))
 $(eval $(call BuildPackage,glib2-gio))
 $(eval $(call BuildPackage,glib2))
+
+$(eval $(call BuildPackage,libgirepository2))
+
+define Package/glib2-utils
+$(call Package/glib2/default)
+  TITLE:=GLib runtime settings and cache utilities
+  DEPENDS:=+glib2
+endef
+
+define Package/glib2-utils/install
+	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/libexec $(1)/etc/uci-defaults
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/glib-compile-schemas $(PKG_INSTALL_DIR)/usr/bin/gio-querymodules $(PKG_INSTALL_DIR)/usr/bin/gsettings $(1)/usr/bin/
+	$(INSTALL_BIN) ./files/glib2-cache-update $(1)/usr/libexec/
+	$(INSTALL_BIN) ./files/glib2-cache-update $(1)/etc/uci-defaults/95-glib2-cache
+endef
+$(eval $(call BuildPackage,glib2-utils))

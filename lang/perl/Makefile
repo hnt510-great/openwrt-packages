@@ -81,6 +81,13 @@ endef
 
 define Host/Install
 	( cd $(HOST_BUILD_DIR); ./miniperl installperl )
+	# Remove obsolete optional core archives left by an earlier host configuration.
+	for module in DB_File GDBM_File NDBM_File ODBM_File; do \
+		if [ ! -f $(HOST_BUILD_DIR)/lib/auto/$$$$module/$$$$module.a ]; then \
+			find $(HOST_PERL_PREFIX)/lib/perl5/$(PKG_VERSION) \
+				-path "*/auto/$$$$module" -type d -prune -exec rm -rf {} +; \
+		fi; \
+	done
 	$(INSTALL_DIR) $(HOST_PERL_PREFIX)/bin/
 	$(CP) $(HOST_BUILD_DIR)/generate_uudmap $(HOST_PERL_PREFIX)/bin/
 	

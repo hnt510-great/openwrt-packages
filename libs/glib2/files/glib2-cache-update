@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+[ ! -d /usr/share/glib-2.0/schemas ] || glib-compile-schemas /usr/share/glib-2.0/schemas
+[ ! -d /usr/lib/gio/modules ] || gio-querymodules /usr/lib/gio/modules
+exit 0

@@ -12,8 +12,12 @@ PKG_LICENSE:=Public-Domain BSD-2-Clause Python-2.0.1 GPL-3.0-or-later
 PKG_LICENSE_FILES:=COPYING.txt licenses/BSD-2-Clause.txt licenses/python-2-1-1.txt licenses/gpl-3-0.txt
 
 include ../pypi.mk
+HOST_BUILD_DEPENDS:=python3/host
+
 include $(INCLUDE_DIR)/package.mk
+include $(INCLUDE_DIR)/host-build.mk
 include ../python3-package.mk
+include ../python3-host-build.mk
 
 define Package/python3-docutils
   SUBMENU:=Python
@@ -34,3 +38,5 @@ endef
 $(eval $(call Py3Package,python3-docutils))
 $(eval $(call BuildPackage,python3-docutils))
 $(eval $(call BuildPackage,python3-docutils-src))
+
+$(eval $(call HostBuild))

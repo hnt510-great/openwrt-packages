@@ -65,8 +65,10 @@ define Package/squeezelite-custom
     MENU:=1
 endef
 
+# FFmpeg prerequisites propagate through SQUEEZELITE_WMA_ALAC to the package;
+# guarding these options with the package would close a dependency cycle.
 define Package/squeezelite-custom/config
-	if PACKAGE_squeezelite-custom
+	menu "Squeezelite custom configuration"
 		config SQUEEZELITE_AAC
 		    bool "AAC codec support"
 		    help
@@ -132,7 +134,7 @@ define Package/squeezelite-custom/config
 		    help
 			WMA and ALAC codec support
 		    default n
-	endif
+	endmenu
 endef
 
 define Package/squeezelite/description/default

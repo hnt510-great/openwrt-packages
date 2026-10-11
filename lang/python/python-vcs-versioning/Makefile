@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=python-vcs-versioning
 PKG_VERSION:=2.5.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PYPI_NAME:=vcs-versioning
 PYPI_SOURCE_NAME:=vcs_versioning
@@ -23,7 +23,7 @@ PKG_HOST_ONLY:=1
 HOST_BUILD_DEPENDS:= \
 	python3/host \
 	python-build/host \
-	python-hatchling/host \
+	python-setuptools/host \
 	python-installer/host \
 	python-packaging/host \
 	python-typing-extensions/host

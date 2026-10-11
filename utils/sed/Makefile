@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sed
 PKG_VERSION:=4.10
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNU/sed
@@ -45,6 +45,8 @@ CONFIGURE_ARGS += \
 	--disable-acl \
 	--disable-xattr \
 	--without-selinux
+
+TARGET_CFLAGS += -std=gnu23
 
 define Build/Compile
 	sed -i 's/SUBDIRS = po . gnulib-tests/SUBDIRS = po ./' $(PKG_BUILD_DIR)/Makefile

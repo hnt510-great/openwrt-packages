@@ -37,10 +37,11 @@ PERLMOD_TESTSDIR:=/usr/share/perl/perlmod-tests
 
 FLOCK:=$(STAGING_DIR_HOST)/bin/flock
 
+# Static host Perl extensions can contain non-PIC objects; disable compiler-default PIE for this executable.
 define perlmod/host/relink
 	rm -f $(1)/Makefile.aperl
 	($(FLOCK) -w 900 9 || { echo perlmod/host/relink: failed to acquire lock; exit 1; }; \
-	    $(MAKE) -C $(1) perl && \
+	    $(MAKE) -C $(1) perl MAP_LINKCMD="$(HOSTCC) -no-pie $(HOST_LDFLAGS)" && \
 	    $(INSTALL_BIN) $(1)/perl $(PERL_CMD) && \
 	    $(INSTALL_BIN) $(1)/perl $(STAGING_DIR_HOSTPKG)/usr/bin/perl \
 	) 9> $(TMP_DIR)/.perlmod-perl.flock
