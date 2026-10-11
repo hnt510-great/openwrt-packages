@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=gstreamer1
 PKG_VERSION:=1.28.7
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=gstreamer-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://gstreamer.freedesktop.org/src/gstreamer
@@ -27,6 +27,11 @@ PKG_BUILD_DEPENDS:=glib2/host gettext-full/host
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/nls.mk
 include $(INCLUDE_DIR)/meson.mk
+
+PKG_CONFIG_DEPENDS += CONFIG_PACKAGE_spice-gtk
+ifneq ($(CONFIG_PACKAGE_spice-gtk),)
+include $(INCLUDE_DIR)/gobject-introspection.mk
+endif
 
 define Package/gstreamer1/Default
   CATEGORY:=Multimedia
@@ -133,7 +138,7 @@ MESON_ARGS += \
 	-Dexamples=disabled \
 	-Dbenchmarks=disabled \
 	-Dtools=enabled \
-	-Dintrospection=disabled \
+	-Dintrospection=$(if $(CONFIG_PACKAGE_spice-gtk),en,dis)abled \
 	-Dnls=enabled \
 	-Dgobject-cast-checks=disabled \
 	-Dglib-asserts=disabled \
@@ -161,12 +166,21 @@ define Build/InstallDev
 		./usr/lib/pkgconfig/gstreamer*-$(GST_VERSION).pc \
 		$(1)/usr/lib/pkgconfig/ \
 	)
+	$(call Build/InstallDev/GIR,$(1))
 	$(INSTALL_DIR) $(2)/share/aclocal
 	( cd $(PKG_INSTALL_DIR); $(CP) \
 		./usr/share/aclocal/* \
 		$(2)/share/aclocal/ \
 	)
 endef
+
+ifneq ($(CONFIG_PACKAGE_spice-gtk),)
+define Build/InstallDev/GIR
+	$(INSTALL_DIR) $(1)/usr/share/gir-1.0 $(1)/usr/lib/girepository-1.0
+	$(CP) $(PKG_INSTALL_DIR)/usr/share/gir-1.0/*.gir $(1)/usr/share/gir-1.0/
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/*.typelib $(1)/usr/lib/girepository-1.0/
+endef
+endif
 
 define Package/gstreamer1/install
   true
@@ -187,6 +201,8 @@ define Package/gstreamer1-utils/install
 endef
 
 define Package/libgstreamer1/install
+	$(if $(CONFIG_PACKAGE_spice-gtk),$(INSTALL_DIR) $(1)/usr/lib/girepository-1.0)
+	$(if $(CONFIG_PACKAGE_spice-gtk),$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/Gst-1.0.typelib $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/GstBase-1.0.typelib $(1)/usr/lib/girepository-1.0/)
 	$(INSTALL_DIR) $(1)/usr/lib
 	( cd $(PKG_INSTALL_DIR); $(CP) \
 		./usr/lib/libgstbase-$(GST_VERSION).so.* \

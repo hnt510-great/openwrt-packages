@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=qemu
 PKG_VERSION:=11.1.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://download.qemu.org/
 PKG_HASH:=079ffbff8a7111bbc89022107cbabf3bbfd614d5fc9d7cc675991196aca12482
@@ -199,6 +199,8 @@ define qemu-target
 	+QEMU_UI_VNC_JPEG:libjpeg \
 	+QEMU_UI_VNC_SASL:libsasl2 \
 	+QEMU_UI_SPICE:libspice-server \
+	+QEMU_OPENGL:libepoxy +QEMU_OPENGL:libmesa \
+	+QEMU_VIRGLRENDERER:virglrenderer \
 	+QEMU_DEV_USB:libusb-1.0 \
 	+QEMU_SECCOMP:libseccomp \
 	+QEMU_ZSTD:libzstd \
@@ -258,6 +260,17 @@ config QEMU_UI_VNC_SASL
 config QEMU_UI_SPICE
 	bool "QEMU SPICE ui support"
 
+config QEMU_OPENGL
+	bool "QEMU OpenGL (EGL/GBM) support"
+	default n
+	depends on HAVE_MESA
+
+config QEMU_VIRGLRENDERER
+	bool "QEMU VirtIO GPU 3D (VirGL) support"
+	default n
+	depends on HAVE_MESA
+	select QEMU_OPENGL
+
 config QEMU_DEV_USB
 	bool "QEMU USB passthrough support"
 	default y
@@ -281,6 +294,8 @@ PKG_CONFIG_DEPENDS += \
 	CONFIG_QEMU_UI_VNC_JPEG \
 	CONFIG_QEMU_UI_VNC_SASL \
 	CONFIG_QEMU_UI_SPICE \
+	CONFIG_QEMU_OPENGL \
+	CONFIG_QEMU_VIRGLRENDERER \
 	CONFIG_QEMU_DEV_USB \
 	CONFIG_QEMU_SECCOMP \
 	CONFIG_QEMU_ZSTD \
@@ -351,7 +366,7 @@ CONFIGURE_ARGS +=			\
 	--disable-sdl			\
 	--disable-sdl-image		\
 	--$(if $(CONFIG_QEMU_UI_SPICE),enable,disable)-spice			\
-	--disable-virglrenderer		\
+	--$(if $(CONFIG_QEMU_VIRGLRENDERER),enable,disable)-virglrenderer		\
 	--$(if $(CONFIG_QEMU_UI_VNC),enable,disable)-vnc			\
 	--$(if $(CONFIG_QEMU_UI_VNC_JPEG),enable,disable)-vnc-jpeg		\
 	--$(if $(CONFIG_QEMU_UI_VNC_SASL),enable,disable)-vnc-sasl		\
@@ -413,7 +428,7 @@ CONFIGURE_ARGS +=			\
 	--disable-netmap		\
 	--disable-nettle		\
 	--disable-numa			\
-	--disable-opengl		\
+	--$(if $(CONFIG_QEMU_OPENGL),enable,disable)-opengl		\
 	--disable-plugins		\
 	--disable-qom-cast-debug	\
 	--disable-rbd			\
