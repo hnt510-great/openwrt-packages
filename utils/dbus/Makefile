@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=dbus
 PKG_VERSION:=1.16.2
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://dbus.freedesktop.org/releases/dbus
@@ -24,7 +24,7 @@ PKG_BUILD_PARALLEL:=1
 PKG_INSTALL:=1
 
 PKG_CONFIG_DEPENDS:= \
-	CONFIG_DBUS_VERBOSE
+	CONFIG_DBUS_VERBOSE CONFIG_OPENWRT_SYSTEMD
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/meson.mk
@@ -49,7 +49,7 @@ define Package/libdbus
 $(call Package/dbus/Default)
   CATEGORY:=Libraries
   TITLE+= (library)
-  DEPENDS:= +libpthread
+  DEPENDS:= +libpthread +OPENWRT_SYSTEMD:libsystemd
 endef
 
 define Package/libdbus/Description
@@ -60,7 +60,7 @@ endef
 define Package/dbus
 $(call Package/dbus/Default)
  TITLE+= (daemon)
- DEPENDS:= +libexpat +libdbus
+ DEPENDS:= +libexpat +libdbus +OPENWRT_SYSTEMD:libsystemd
 endef
 
 define Package/dbus/Description
@@ -98,13 +98,13 @@ MESON_ARGS += \
 	-Dlibaudit=disabled \
 	-Dinotify=enabled \
 	-Dkqueue=disabled \
-	-Dsystemd=disabled \
+	-Dsystemd=$(if $(CONFIG_OPENWRT_SYSTEMD),enabled,disabled) \
 	-Dmodular_tests=disabled \
 	-Dintrusive_tests=false \
 	-Dinstalled_tests=false \
 	-Dx11_autolaunch=disabled \
 	-Dtools=true \
-	-Duser_session=false \
+	-Duser_session=$(if $(CONFIG_OPENWRT_SYSTEMD),true,false) \
 	-Dmessage_bus=true \
 	-Dstats=false
 
@@ -149,6 +149,7 @@ define Package/dbus/install
 	$(INSTALL_BIN) ./files/dbus.init $(1)/etc/init.d/dbus
 	$(INSTALL_DIR) $(1)/usr/share/dbus-1
 	$(CP) $(PKG_INSTALL_DIR)/usr/share/dbus-1 $(1)/usr/share/
+	$(if $(CONFIG_OPENWRT_SYSTEMD),$(SED) 's|/usr/libexec/dbus-daemon-launch-helper|/usr/lib/dbus-daemon-launch-helper|g' $(1)/usr/share/dbus-1/system.conf)
 	$(INSTALL_DIR) $(1)/etc/capabilities
 	$(INSTALL_DATA) ./files/dbus.json $(1)/etc/capabilities
 endef

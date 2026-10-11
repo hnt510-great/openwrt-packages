@@ -11,6 +11,7 @@ PKG_NAME:=openssh
 PKG_REALVERSION:=10.6p1
 PKG_VERSION:=10.6_p1
 PKG_RELEASE:=1
+PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_REALVERSION).tar.gz
 PKG_SOURCE_URL:=https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/ \
@@ -257,6 +258,7 @@ define Package/openssh-server-pam/install
 	sed -i 's,#UsePAM no,UsePAM yes,g' $(1)/etc/ssh/sshd_config
 	$(INSTALL_DIR) $(1)/etc/pam.d
 	$(INSTALL_DATA) ./files/sshd.pam $(1)/etc/pam.d/sshd
+	$(if $(CONFIG_OPENWRT_SYSTEMD),$(SED) '/^session.*include.*common-session/a session optional pam_systemd.so' $(1)/etc/pam.d/sshd)
 	$(INSTALL_DIR) $(1)/etc/security
 	$(INSTALL_DATA) ./files/sshd.pam-access $(1)/etc/security/access-sshd-local.conf
 endef
