@@ -1,0 +1,25 @@
+Subject: ui/spice: avoid freeing unsupported input interfaces on shutdown
+
+Based on Fiona Ebner's Proxmox workaround for released spice-server versions
+without upstream c3efe69e (inputs: Fix keyboard and mouse state leaks on
+interface removal). Removing mouse/keyboard returns an error but QEMU frees
+the callback structures anyway, causing use-after-free in server teardown.
+Keep those interfaces alive until process exit as QEMU before 11.1 did.
+
+Reference: https://git.proxmox.com/?p=pve-qemu.git;a=blob_plain;f=debian/patches/pve/0046-ui-spice-core-work-around-broken-input-cleanup-in-li.patch;hb=HEAD
+
+--- a/ui/spice-core.c
++++ b/ui/spice-core.c
+@@ -1016,7 +1016,11 @@
+     }
+ 
+     qemu_spice_display_cleanup();
+-    qemu_spice_input_cleanup();
++    /* Released spice-server versions cannot detach keyboard/mouse inputs.
++     * Keep their callbacks alive until spice_server_destroy() below.
++     * QEMU 11.1 added this cleanup; older QEMU also left inputs attached.
++     * See Proxmox's workaround for spice-server <= 0.16.0.
++     */
+     migration_remove_notifier(&migration_state);
+     g_clear_pointer(&spice_consoles, g_slist_free);
+     g_clear_pointer(&auth_passwd, g_free);

@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=qemu
 PKG_VERSION:=11.1.1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://download.qemu.org/
 PKG_HASH:=079ffbff8a7111bbc89022107cbabf3bbfd614d5fc9d7cc675991196aca12482
@@ -457,6 +457,7 @@ CONFIGURE_ARGS +=			\
 	--disable-selinux		\
 	--disable-oss			\
 	--disable-alsa			\
+	--disable-pipewire		\
 	--disable-pa			\
 	--disable-vduse-blk-export	\
 	--disable-libdw			\
