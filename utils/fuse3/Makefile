@@ -10,7 +10,7 @@ include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=fuse3
 PKG_VERSION:=3.18.2
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=fuse-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://github.com/libfuse/libfuse/releases/download/fuse-$(PKG_VERSION)
@@ -20,7 +20,7 @@ PKG_BUILD_DIR:=$(BUILD_DIR)/fuse-$(PKG_VERSION)
 PKG_MAINTAINER:=Alexandru Ardelean <ardeleanalex@gmail.com>
 PKG_CPE_ID:=cpe:/a:fuse_project:fuse
 
-PKG_CONFIG_DEPENDS:=CONFIG_PACKAGE_fuse3-utils
+PKG_CONFIG_DEPENDS:=CONFIG_PACKAGE_fuse3-utils CONFIG_FUSE3_UTILS_SETUID
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/meson.mk
@@ -71,6 +71,16 @@ $(call Package/fuse3/Default/description)
  - mount.fuse3
 endef
 
+define Package/fuse3-utils/config
+	config FUSE3_UTILS_SETUID
+		bool "Allow ordinary users to mount FUSE filesystems"
+		depends on PACKAGE_fuse3-utils
+		default n
+		help
+		  Install fusermount3 setuid root. Required by the Flatpak
+		  document portal for ordinary-user file access.
+endef
+
 MESON_ARGS += \
 	-Ddisable-mtab=true \
 	-Dudevrulesdir=/dev/null \
@@ -95,6 +105,7 @@ endef
 define Package/fuse3-utils/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(CP) $(PKG_INSTALL_DIR)/usr/bin/fusermount3 $(1)/usr/bin/
+	$(if $(CONFIG_FUSE3_UTILS_SETUID),chmod 4755 $(1)/usr/bin/fusermount3)
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(CP) $(PKG_INSTALL_DIR)/usr/sbin/mount.fuse3 $(1)/usr/sbin/
 endef
