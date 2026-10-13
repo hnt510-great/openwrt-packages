@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=crun
 PKG_VERSION:=1.28
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/containers/crun/tar.gz/$(PKG_VERSION)?
@@ -12,6 +12,7 @@ PKG_BUILD_DEPENDS:=argp-standalone
 PKG_BUILD_PARALLEL:=1
 PKG_FIXUP:=autoreconf
 PKG_INSTALL:=1
+PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 PKG_MAINTAINER:=Oskari Rauta <oskari.rauta@gmail.com>
 PKG_LICENSE:=GPL-2.0-or-later
@@ -25,7 +26,7 @@ define Package/crun
   CATEGORY:=Utilities
   TITLE:=crun
   URL:=https://github.com/containers/crun
-  DEPENDS:=@!arc +libseccomp +libcap +libgcrypt +libjson-c
+  DEPENDS:=@!arc +libseccomp +libcap +libgcrypt +libjson-c +OPENWRT_SYSTEMD:libsystemd
 endef
 
 define Package/crun/description
@@ -45,7 +46,7 @@ endef
 $(eval $(call Download,libocispec))
 
 CONFIGURE_ARGS+= \
-	--disable-systemd \
+	--$(if $(CONFIG_OPENWRT_SYSTEMD),enable,disable)-systemd \
 	--enable-caps \
 	--enable-dl \
 	--enable-seccomp \

@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=podman
 PKG_VERSION:=5.8.4
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://github.com/podman-container-tools/podman/archive/v$(PKG_VERSION)
@@ -17,6 +17,7 @@ PKG_BUILD_DEPENDS:=golang/host protobuf/host btrfs-progs
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 PKG_INSTALL:=1
+PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 include $(INCLUDE_DIR)/package.mk
 include ../../lang/golang/golang-package.mk
@@ -42,7 +43,8 @@ define Package/podman
   URL:=https://podman.io
   DEPENDS:=$(GO_ARCH_DEPENDS) +conmon +libgpgme +libseccomp +nsenter \
 	+zoneinfo-simple +kmod-veth +slirp4netns +netavark +aardvark-dns \
-	+catatonit +crun +PODMAN_SELINUX_SUPPORT:libselinux
+	+catatonit +crun +kmod-tun +shadow-newuidmap +shadow-newgidmap \
+	+PODMAN_SELINUX_SUPPORT:libselinux
 endef
 
 define Package/podman/description
@@ -102,6 +104,9 @@ define Package/podman/install
 	$(INSTALL_DATA) $(DL_DIR)/registries.fedora-da9a9c8778 $(1)/etc/containers/registries.conf
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/vendor/go.podman.io/storage/storage.conf $(1)/etc/containers/storage.conf
 	$(INSTALL_DATA) ./files/containers.conf $(1)/etc/containers/containers.conf
+ifeq ($(CONFIG_OPENWRT_SYSTEMD),y)
+	$(SED) 's/cgroup_manager = "cgroupfs"/cgroup_manager = "systemd"/' $(1)/etc/containers/containers.conf
+endif
 	$(INSTALL_DIR) $(1)/etc/containers/networks
 	$(INSTALL_CONF) ./files/podman.json $(1)/etc/containers/networks
 	$(INSTALL_DIR) $(1)/usr/share/containers
