@@ -69,6 +69,19 @@ define Package/net-tools-route/description
 	functionality of the net-tools variant (e.g. AF_X25).
 endef
 
+define Package/net-tools-ifconfig
+  SECTION:=net
+  CATEGORY:=Network
+  TITLE:=net-tools - ifconfig utility
+  URL:=https://net-tools.sourceforge.io/
+  ALTERNATIVES:=300:/sbin/ifconfig:/usr/libexec/net-tools-ifconfig
+endef
+
+define Package/net-tools-ifconfig/install
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ifconfig $(1)/usr/libexec/net-tools-ifconfig
+endef
+
 define Build/Configure
 	# Failed configure.sh leaves stub config.h around.
 	rm -f $(PKG_BUILD_DIR)/config.h
@@ -91,5 +104,6 @@ define Package/net-tools-route/install
 endef
 
 $(eval $(call BuildPackage,mii-tool))
+$(eval $(call BuildPackage,net-tools-ifconfig))
 $(eval $(call BuildPackage,net-tools-netstat))
 $(eval $(call BuildPackage,net-tools-route))
