@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=openssh
 PKG_REALVERSION:=10.6p1
 PKG_VERSION:=10.6_p1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_REALVERSION).tar.gz
@@ -225,6 +225,7 @@ endef
 define Package/openssh-client-utils/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(foreach bin,add agent keyscan keysign,$(PKG_BUILD_DIR)/ssh-$(bin)) $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/contrib/ssh-copy-id $(1)/usr/bin/
 endef
 
 define Package/openssh-keygen/install
