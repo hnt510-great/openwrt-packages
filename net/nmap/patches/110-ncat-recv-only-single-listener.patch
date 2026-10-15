@@ -1,0 +1,18 @@
+From: OpenWrt developers
+Subject: ncat: keep a single receive-only listener in the event loop
+
+With --recv-only stdin is not added to client_fdlist. A listener bound to
+one explicit address therefore has only one descriptor and must not be
+mistaken for an idle stdin-only list before its first connection arrives.
+
+--- a/ncat/ncat_listen.c
++++ b/ncat/ncat_listen.c
+@@ -336,7 +336,7 @@ int ncat_listen()
+ 
+     init_fdlist(&broadcast_fdlist, o.conn_limit);
+ 
+-    while (!breakloop && (client_fdlist.nfds > 1 || get_conn_count() > 0)) {
++    while (!breakloop && (client_fdlist.nfds > (o.recvonly ? 0 : 1) || get_conn_count() > 0)) {
+         long usec_wait = -1;
+         tvp = NULL;
+         /* We pass these temporary descriptor sets to fselect, since fselect
