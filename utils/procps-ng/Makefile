@@ -30,7 +30,7 @@ CONFIGURE_ARGS += --enable-skill
 
 # most of these have alternatives provided by busybox applets
 PROCPS_APPLETS := \
-    free kill pgrep pkill pmap ps pwdx skill slabtop \
+    free kill pgrep pidof pkill pmap ps pwdx skill slabtop \
     snice sysctl tload top uptime vmstat w watch
 
 # procps-ng will be configured with "--bindir=/usr/bin --sbindir=/usr/sbin" and
