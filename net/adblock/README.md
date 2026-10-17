@@ -96,6 +96,7 @@ Support of the following fully pre-configured domain blocklist feeds (free for p
 * Supports a wide range of router modes, even AP modes are supported
 * Full IPv4 and IPv6 support
 * Provides top level domain compression (`tld compression`), this feature removes thousands of needless host entries from the blocklist and lowers the memory footprint for the DNS backend
+* Packs multiple domains per dnsmasq 'local=' line (max. 1000 characters), this reduces the size of the final blocklist by ~30% and speeds up the dnsmasq start
 * Provides a `DNS Blocklist Shift`, where the generated final DNS blocklist is moved to the backup directory and only a soft link to this file is set in memory. As long as your backup directory is located on an external drive, you should activate this option to save valuable RAM.
 * Feed parsing by a very fast & secure domain validator, all domain rules and feed information are placed in an external JSON file (`/etc/adblock/adblock.feeds`)
 * Overall duplicate removal in generated blocklist file `adb_list.overall`
@@ -303,6 +304,9 @@ adblock keeps all working data in RAM to avoid unnecessary flash wear. The numbe
 * Enable blocklist shifting: Activate adb_dnsshift to store the generated blocklist on external storage and keep only a symlink in RAM
 * Use firewall‑based DNS redirection: Route DNS queries via nftables to external filtered DNS resolvers and keep only a minimal local blocklist active
 * Use compressed swap: install the `zram-swap` package so the kernel can page out cold memory into compressed RAM under pressure (see below)
+
+**Recommendation for slow CPUs**  
+The top level domain compression (`adb_tld`) is enabled by default and keeps the blocklist compact, but it needs an additional label reversal per feed and an extra pass over the merged blocklist. On slow CPUs this roughly doubles the processing time, while today's curated feeds are largely compressed already and the number of removed entries is small. If the processing time matters more than a slightly smaller blocklist, set `adb_tld=0`. Example: on a 2-core router with the hagezi pro and oisd big feeds the processing time drops from 14.5 to 7.5 seconds, the blocklist grows by 1.3% (~4,700 entries).
 
 **Use compressed swap (zram-swap) on low memory devices**  
 The simplest way to survive the memory peak during feed processing is to give the kernel a compressed swap device and let it page out cold memory under pressure. The `zram-swap` package sets this up automatically at boot — no scripting, no changes to adblock, and adblock benefits transparently. Because the swap lives in compressed RAM rather than on flash, this incurs no flash wear.
