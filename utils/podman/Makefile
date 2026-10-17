@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=podman
 PKG_VERSION:=5.8.4
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://github.com/podman-container-tools/podman/archive/v$(PKG_VERSION)
@@ -43,7 +43,8 @@ define Package/podman
   URL:=https://podman.io
   DEPENDS:=$(GO_ARCH_DEPENDS) +conmon +libgpgme +libseccomp +nsenter \
 	+zoneinfo-simple +kmod-veth +slirp4netns +netavark +aardvark-dns \
-	+catatonit +crun +kmod-tun +shadow-newuidmap +shadow-newgidmap \
+	+catatonit +crun +OPENWRT_SYSTEMD:libsystemd +kmod-tun \
+	+shadow-newuidmap +shadow-newgidmap \
 	+PODMAN_SELINUX_SUPPORT:libselinux
 endef
 
@@ -70,6 +71,9 @@ define Package/podman/conffiles
 endef
 
 GO_PKG_TAGS:=seccomp exclude_graphdriver_devicemapper apparmor
+ifeq ($(CONFIG_OPENWRT_SYSTEMD),y)
+  GO_PKG_TAGS+= systemd
+endif
 ifdef CONFIG_PODMAN_SELINUX_SUPPORT
   GO_PKG_TAGS+= selinux
 endif
@@ -81,7 +85,7 @@ MAKE_VARS += \
 	PREFIX=/usr \
 	LIBEXECDIR=/usr/lib \
 	LIBEXECPODMAN=/usr/lib/podman \
-	TMPFILESDIR=/var/run/podman \
+	TMPFILESDIR=/usr/lib/tmpfiles.d \
 	BUILDTAGS="$(GO_PKG_TAGS)"
 
 define Build/Prepare
@@ -105,7 +109,43 @@ define Package/podman/install
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/vendor/go.podman.io/storage/storage.conf $(1)/etc/containers/storage.conf
 	$(INSTALL_DATA) ./files/containers.conf $(1)/etc/containers/containers.conf
 ifeq ($(CONFIG_OPENWRT_SYSTEMD),y)
-	$(SED) 's/cgroup_manager = "cgroupfs"/cgroup_manager = "systemd"/' $(1)/etc/containers/containers.conf
+	$(INSTALL_DIR) $(1)/usr/lib/systemd/system $(1)/usr/lib/systemd/user
+	$(INSTALL_DATA) \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman.socket \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman-restart.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman-auto-update.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman-auto-update.timer \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman-kube@.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman-clean-transient.service \
+		$(1)/usr/lib/systemd/system/
+	$(INSTALL_DATA) \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman.socket \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman-restart.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman-auto-update.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman-auto-update.timer \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman-kube@.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman-clean-transient.service \
+		$(PKG_INSTALL_DIR)/usr/lib/systemd/user/podman-user-wait-network-online.service \
+		$(1)/usr/lib/systemd/user/
+	$(INSTALL_DIR) $(1)/usr/lib/systemd/system-generators \
+		$(1)/usr/lib/systemd/user-generators $(1)/usr/lib/tmpfiles.d
+	$(LN) ../../podman/quadlet \
+		$(1)/usr/lib/systemd/system-generators/podman-system-generator
+	$(LN) ../../podman/quadlet \
+		$(1)/usr/lib/systemd/user-generators/podman-user-generator
+	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/lib/tmpfiles.d/podman.conf \
+		$(1)/usr/lib/tmpfiles.d/podman.conf
+	$(INSTALL_DIR) $(1)/usr/lib/systemd/user/sockets.target.wants \
+		$(1)/usr/lib/systemd/user/default.target.wants \
+		$(1)/usr/lib/systemd/user/timers.target.wants
+	$(LN) ../podman.socket \
+		$(1)/usr/lib/systemd/user/sockets.target.wants/podman.socket
+	$(LN) ../podman-restart.service \
+		$(1)/usr/lib/systemd/user/default.target.wants/podman-restart.service
+	$(LN) ../podman-auto-update.timer \
+		$(1)/usr/lib/systemd/user/timers.target.wants/podman-auto-update.timer
 endif
 	$(INSTALL_DIR) $(1)/etc/containers/networks
 	$(INSTALL_CONF) ./files/podman.json $(1)/etc/containers/networks
@@ -116,6 +156,21 @@ endif
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/podman.defaults $(1)/etc/uci-defaults/90-podman
 	$(SED) 's/driver = \"\"/driver = \"overlay\"/g' $(1)/etc/containers/storage.conf
+endef
+
+define Package/podman/postinst
+#!/bin/sh
+[ -n "$$IPKG_INSTROOT" ] && exit 0
+[ "$${PKG_UPGRADE:-0}" = "1" ] || exit 0
+conf=/etc/containers/containers.conf
+[ -f "$$conf" ] || exit 0
+# Drop only the values injected by older packages; Podman now selects the
+# backend at runtime (systemd boot: systemd cgroups + journald; procd: cgroupfs
+# + file events). User-added values with other formatting are left untouched.
+sed -i -e '/^events_logger = "none"$$/d' \
+	-e '/^cgroup_manager = "systemd"$$/d' \
+	-e '/^cgroup_manager = "cgroupfs"$$/d' "$$conf"
+exit 0
 endef
 
 $(eval $(call BuildPackage,podman))

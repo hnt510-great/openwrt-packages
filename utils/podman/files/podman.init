@@ -7,6 +7,9 @@ NAME=podman
 PROG=/usr/bin/podman
 
 start_service() {
+	# Native systemd owns the API socket and user managers. Keep this rootful
+	# API path for the procd recovery boot only.
+	[ -e /run/systemd/system ] && return 0
 	[ -d /run/podman ] || mkdir -p /run/podman
 	procd_open_instance "podman"
 	procd_set_param command "$PROG" system service --time=0
@@ -15,6 +18,7 @@ start_service() {
 }
 
 shutdown() {
+	[ -e /run/systemd/system ] && return 0
 	${PROG} pod stop -a
 	${PROG} container stop -a
 }
