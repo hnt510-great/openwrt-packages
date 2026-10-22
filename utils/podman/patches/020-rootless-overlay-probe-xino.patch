@@ -1,0 +1,59 @@
+Subject: [PATCH] overlay: disable xino in rootless capability probes
+
+Rootless mounts lack CAP_DAC_READ_SEARCH in the initial user namespace.
+The kernel cannot decode lower file handles and xino=auto always falls
+back to off. Select that behavior explicitly in temporary probe mounts,
+including those which do not accept the configured storage mount options.
+Rootful mounts and administrator-selected runtime mount options are unchanged.
+
+---
+--- a/vendor/go.podman.io/storage/drivers/overlay/check.go
++++ b/vendor/go.podman.io/storage/drivers/overlay/check.go
+@@ -63,7 +63,7 @@
+ 
+ 	mountFlags := "lowerdir=%s:%s,upperdir=%s,workdir=%s"
+ 	if unshare.IsRootless() {
+-		mountFlags = mountFlags + ",userxattr"
++		mountFlags = mountFlags + ",userxattr,xino=off"
+ 	}
+ 
+ 	opts := fmt.Sprintf(mountFlags, path.Join(td, "l2"), path.Join(td, "l1"), path.Join(td, "l3"), path.Join(td, "work"))
+@@ -149,7 +149,7 @@
+ 	// Mount using the mandatory options and configured options
+ 	opts := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", path.Join(td, "l1"), path.Join(td, "l2"), path.Join(td, "work"))
+ 	if unshare.IsRootless() {
+-		opts = fmt.Sprintf("%s,userxattr", opts)
++		opts = fmt.Sprintf("%s,userxattr,xino=off", opts)
+ 	}
+ 	flags, data := mount.ParseOptions(mountOpts)
+ 	if data != "" {
+@@ -210,7 +210,7 @@
+ 	// Mount using the mandatory options and configured options
+ 	opts := fmt.Sprintf("volatile,lowerdir=%s,upperdir=%s,workdir=%s", path.Join(td, "lower"), path.Join(td, "upper"), path.Join(td, "work"))
+ 	if unshare.IsRootless() {
+-		opts = fmt.Sprintf("%s,userxattr", opts)
++		opts = fmt.Sprintf("%s,userxattr,xino=off", opts)
+ 	}
+ 	if err := unix.Mount("overlay", filepath.Join(td, "merged"), "overlay", 0, opts); err != nil {
+ 		return false, fmt.Errorf("failed to mount overlay for volatile check: %w", err)
+--- a/vendor/go.podman.io/storage/drivers/overlay/overlay.go
++++ b/vendor/go.podman.io/storage/drivers/overlay/overlay.go
+@@ -736,7 +736,7 @@
+ 			flags = label.FormatMountLabel(flags, selinuxLabelTest)
+ 		}
+ 		if unshare.IsRootless() {
+-			flags = fmt.Sprintf("%s,userxattr", flags)
++			flags = fmt.Sprintf("%s,userxattr,xino=off", flags)
+ 		}
+ 		if err := syscall.Mknod(filepath.Join(upperDir, "whiteout"), syscall.S_IFCHR|0o600, int(unix.Mkdev(0, 0))); err != nil {
+ 			logrus.Debugf("Unable to create kernel-style whiteout: %v", err)
+@@ -756,6 +756,9 @@
+ 			logrus.Debugf("overlay: test mount with multiple lowers failed: %v", err)
+ 		}
+ 		flags = fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lower1Dir, upperDir, workDir)
++		if unshare.IsRootless() {
++			flags += ",userxattr,xino=off"
++		}
+ 		if selinux.GetEnabled() {
+ 			flags = label.FormatMountLabel(flags, selinuxLabelTest)
+ 		}
