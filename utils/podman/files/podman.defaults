@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Upgrades must not reapply first-boot firewall or DHCP integration.
+[ "${PKG_UPGRADE:-0}" = 1 ] && exit 0
+
 changed=0
 
 if uci -q get dhcp.@dnsmasq[0] >/dev/null; then

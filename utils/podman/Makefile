@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=podman
 PKG_VERSION:=5.8.4
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://github.com/podman-container-tools/podman/archive/v$(PKG_VERSION)
@@ -43,7 +43,7 @@ define Package/podman
   URL:=https://podman.io
   DEPENDS:=$(GO_ARCH_DEPENDS) +conmon +libgpgme +libseccomp +nsenter \
 	+zoneinfo-simple +kmod-veth +slirp4netns +netavark +aardvark-dns \
-	+catatonit +crun +OPENWRT_SYSTEMD:libsystemd +kmod-tun \
+	+catatonit +crun +OPENWRT_SYSTEMD:libsystemd +OPENWRT_SYSTEMD:passt +kmod-tun \
 	+shadow-newuidmap +shadow-newgidmap \
 	+PODMAN_SELINUX_SUPPORT:libselinux
 endef
@@ -109,6 +109,7 @@ define Package/podman/install
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/vendor/go.podman.io/storage/storage.conf $(1)/etc/containers/storage.conf
 	$(INSTALL_DATA) ./files/containers.conf $(1)/etc/containers/containers.conf
 ifeq ($(CONFIG_OPENWRT_SYSTEMD),y)
+	$(SED) 's/default_rootless_network_cmd = "slirp4netns"/default_rootless_network_cmd = "pasta"/' $(1)/etc/containers/containers.conf
 	$(INSTALL_DIR) $(1)/usr/lib/systemd/system $(1)/usr/lib/systemd/user
 	$(INSTALL_DATA) \
 		$(PKG_INSTALL_DIR)/usr/lib/systemd/system/podman.service \
@@ -170,6 +171,7 @@ conf=/etc/containers/containers.conf
 sed -i -e '/^events_logger = "none"$$/d' \
 	-e '/^cgroup_manager = "systemd"$$/d' \
 	-e '/^cgroup_manager = "cgroupfs"$$/d' "$$conf"
+$(if $(CONFIG_OPENWRT_SYSTEMD),sed -i -e 's/^default_rootless_network_cmd = "slirp4netns"$$/default_rootless_network_cmd = "pasta"/' -e '/^network_cmd_path = "\/usr\/bin\/slirp4netns"$$/d' "$$conf")
 exit 0
 endef
 
