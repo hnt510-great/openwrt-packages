@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenSSH server
+After=openwrt-services.service systemd-user-sessions.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=notify-reload
+ExecStartPre=/usr/libexec/sshd-prepare
+ExecStartPre=/usr/sbin/sshd -t
+ExecStart=/usr/sbin/sshd -D
+ExecReload=/usr/sbin/sshd -t
+Restart=on-failure
+RestartSec=5s
+# Existing connections survive listener stop/restart. PAM/logind owns sessions.
+KillMode=process
+TimeoutStartSec=90
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

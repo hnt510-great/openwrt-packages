@@ -4,6 +4,19 @@
 START=50
 STOP=50
 
+# rc.d enablement remains independent for procd recovery. Runtime operations
+# must not register a second listener with procd in native-systemd mode.
+if [ -z "$IPKG_INSTROOT" ] && [ -d /run/systemd/system ] &&
+   [ -f /usr/lib/systemd/system/sshd.service ]; then
+	case "$action" in
+		enable|disable|enabled|help|depends) ;;
+		*)
+			echo 'OpenSSH is managed by sshd.service; use systemctl. rc.d enablement applies to procd recovery only.' >&2
+			exit 1
+			;;
+	esac
+fi
+
 USE_PROCD=1
 PROG=/usr/sbin/sshd
 

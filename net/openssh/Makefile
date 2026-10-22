@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=openssh
 PKG_REALVERSION:=10.6p1
 PKG_VERSION:=10.6_p1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_REALVERSION).tar.gz
@@ -238,6 +238,12 @@ define Package/openssh-sk-helper/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/lib/ssh-sk-helper $(1)/usr/lib/
 endef
 
+define Package/openssh-server/install-systemd
+	$(INSTALL_DIR) $(1)/usr/lib/systemd/system $(1)/usr/libexec
+	$(INSTALL_DATA) ./files/sshd.service $(1)/usr/lib/systemd/system/
+	$(INSTALL_BIN) ./files/sshd-prepare ./files/sshd-systemd $(1)/usr/libexec/
+endef
+
 define Package/openssh-server/install
 	install -d -m0755 $(1)/etc/ssh $(1)/etc/ssh/sshd_config.d
 	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/etc/ssh/sshd_config $(1)/etc/ssh/
@@ -251,7 +257,25 @@ define Package/openssh-server/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/lib/sshd-auth $(1)/usr/lib/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/lib/sshd-session $(1)/usr/lib/
+	$(if $(CONFIG_OPENWRT_SYSTEMD),$(call Package/openssh-server/install-systemd,$(1)))
 endef
+
+define Package/openssh-server/postinst
+#!/bin/sh
+if [ -x "$${IPKG_INSTROOT}/usr/libexec/sshd-systemd" ]; then
+	"$${IPKG_INSTROOT}/usr/libexec/sshd-systemd" postinst
+fi
+endef
+
+define Package/openssh-server/prerm
+#!/bin/sh
+if [ -x "$${IPKG_INSTROOT}/usr/libexec/sshd-systemd" ]; then
+	"$${IPKG_INSTROOT}/usr/libexec/sshd-systemd" prerm
+fi
+endef
+
+Package/openssh-server-pam/postinst = $(Package/openssh-server/postinst)
+Package/openssh-server-pam/prerm = $(Package/openssh-server/prerm)
 
 define Package/openssh-server-pam/install
 	$(call Package/openssh-server/install,$(1))

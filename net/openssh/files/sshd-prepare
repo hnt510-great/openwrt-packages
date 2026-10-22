@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+umask 077
+mkdir -p /etc/ssh /var/empty
+chown root:root /var/empty
+chmod 0700 /var/empty
+
+for type in rsa ed25519; do
+	key=/etc/ssh/ssh_host_${type}_key
+	if [ -e "$key" ] || [ -L "$key" ]; then
+		# Never replace an existing host identity, including an invalid key.
+		/usr/bin/ssh-keygen -y -P '' -f "$key" >/dev/null || exit 1
+	else
+		/usr/bin/ssh-keygen -q -N '' -t "$type" -f "$key"
+	fi
+done
