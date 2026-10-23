@@ -25,7 +25,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ffmpeg
 PKG_VERSION:=9.0.1
-PKG_RELEASE:=2
+PKG_RELEASE:=4
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://ffmpeg.org/releases/
@@ -300,6 +300,7 @@ $(call Package/libffmpeg/Default)
 	+FFMPEG_BZLIB:libbz2 \
 	+FFMPEG_LZMA:liblzma \
 	+FFMPEG_LIBDRM:libdrm \
+	+FFMPEG_VAAPI:libva \
 	+FFMPEG_V4L2_REQUEST:libdrm \
 	+FFMPEG_V4L2_REQUEST:libudev \
 	+FFMPEG_LIBV4L2:libv4l \
@@ -316,9 +317,7 @@ $(call Package/libffmpeg/Default)
 	+FFMPEG_SHINE:shine \
 	+FFMPEG_LIBX264:libx264 \
 	+FFMPEG_FDK_AAC:fdk-aac
-  # prepared, disabled until the libva / dav1d packages exist in the feeds
-  # (the matching options in Config.in are commented out as well):
-  #	+FFMPEG_VAAPI:libva
+  # Prepared, disabled until libdav1d exists in the feeds:
   #	+FFMPEG_LIBDAV1D:libdav1d
   VARIANT:=default
   # transitional aliases for packages still depending on the now gone ones
@@ -508,10 +507,7 @@ ifeq ($(BUILD_VARIANT),default)
   # option. Kodi requires it.
   # v4l2-request/libudev: options from patches/120-v4l2-request-*.patch, see
   # the common block above.
-  # vaapi/libdav1d: literal --disable until the libva / dav1d packages exist
-  # in the feeds; then restore $(call FFMPEG_OPT,FFMPEG_VAAPI,vaapi),
-  # $(call FFMPEG_OPT,FFMPEG_LIBDAV1D,libdav1d) and, for manual component
-  # selection, --enable-hwaccel=*_vaapi / --enable-decoder=libdav1d.
+  # libdav1d remains disabled until its package exists in the feeds.
   FFMPEG_CONFIGURE+= \
 	$(call FFMPEG_OPT,FFMPEG_GPL,gpl) \
 	$(call FFMPEG_OPT,FFMPEG_GPL,postproc) \
@@ -523,7 +519,7 @@ ifeq ($(BUILD_VARIANT),default)
 	$(call FFMPEG_OPT,FFMPEG_V4L2_M2M,v4l2-m2m) \
 	$(call FFMPEG_OPT,FFMPEG_V4L2_REQUEST,v4l2-request) \
 	$(call FFMPEG_OPT,FFMPEG_V4L2_REQUEST,libudev) \
-	--disable-vaapi \
+	$(call FFMPEG_OPT,FFMPEG_VAAPI,vaapi) \
 	$(call FFMPEG_OPT,FFMPEG_LIBV4L2,libv4l2) \
 	$(call FFMPEG_OPT,FFMPEG_TLS_GNUTLS,gnutls) \
 	$(call FFMPEG_OPT,FFMPEG_TLS_OPENSSL,openssl) \
@@ -571,6 +567,7 @@ ifeq ($(BUILD_VARIANT),default)
 		$(if $(CONFIG_FFMPEG_TLS_NONE),,--enable-protocol=tls --enable-protocol=https) \
 		$(if $(CONFIG_FFMPEG_V4L2_M2M),--enable-decoder=*_v4l2m2m --enable-encoder=*_v4l2m2m) \
 		$(if $(CONFIG_FFMPEG_V4L2_REQUEST),--enable-hwaccel=*_v4l2request) \
+		$(if $(CONFIG_FFMPEG_VAAPI),--enable-hwaccel=*_vaapi) \
 		$(if $(CONFIG_FFMPEG_LIBOPUS),--enable-decoder=libopus --enable-encoder=libopus) \
 		$(if $(CONFIG_FFMPEG_LIBVORBIS),--enable-encoder=libvorbis) \
 		$(if $(CONFIG_FFMPEG_LIBVPX),--enable-decoder=libvpx_vp8 --enable-decoder=libvpx_vp9 --enable-encoder=libvpx_vp8 --enable-encoder=libvpx_vp9) \
@@ -636,6 +633,11 @@ define Build/InstallDev/Default
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/lib*.{a,so*} $(1)/usr/lib/
 	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/*.pc $(1)/usr/lib/pkgconfig/
+	# Sunshine's CBS adapter must use headers matching this exact target archive.
+	$(INSTALL_DIR) $(1)/usr/include/ffmpeg-private
+	(cd $(PKG_BUILD_DIR); find libavcodec libavutil -type f -name '*.h' | \
+		$(TAR) -cf - -T -) | $(TAR) -xf - -C $(1)/usr/include/ffmpeg-private
+	$(CP) $(PKG_BUILD_DIR)/config.h $(1)/usr/include/ffmpeg-private/
 endef
 
 # Both variants stage into the same directory; libffmpeg takes precedence,

@@ -71,11 +71,13 @@ config FFMPEG_V4L2_REQUEST
 	  Stateless V4L2 hardware decoding (cedrus, hantro, rkvdec, ...)
 	  exporting DRM_PRIME frames. Requires libdrm and libudev.
 
-# VA-API support is prepared but disabled until a libva package exists in
-# the feeds; uncomment (and the DEPENDS line in the Makefile) once it does.
-#config FFMPEG_VAAPI
-#	bool "VA-API hardware acceleration"
-#	default n
+config FFMPEG_VAAPI
+	bool "VA-API hardware acceleration"
+	select FFMPEG_LIBDRM
+	default n
+	help
+	  Enable VA-API through libva's DRM backend. A hardware-specific VA-API
+	  driver and access to a DRM render node are required at runtime.
 
 comment "Transport layer security"
 

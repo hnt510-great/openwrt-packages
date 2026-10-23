@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nlohmannjson
 PKG_VERSION:=3.11.2
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).zip
 PKG_SOURCE_URL:=https://codeload.github.com/nlohmann/json/zip/v$(PKG_VERSION)?
@@ -37,6 +37,8 @@ define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/include/nlohmann
 	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/include/nlohmann/json.hpp $(1)/usr/include/nlohmann
 	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/include/nlohmann/json_fwd.hpp $(1)/usr/include/nlohmann
+	$(INSTALL_DIR) $(1)/usr/lib/cmake/nlohmann_json
+	$(INSTALL_DATA) ./files/*.cmake $(1)/usr/lib/cmake/nlohmann_json/
 	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig
 	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/nlohmann_json.pc $(1)/usr/lib/pkgconfig
 endef

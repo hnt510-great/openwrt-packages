@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=gstreamer1
 PKG_VERSION:=1.28.7
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE:=gstreamer-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://gstreamer.freedesktop.org/src/gstreamer
@@ -219,8 +219,9 @@ define Package/libgstreamer1/install
 		./usr/lib/gstreamer-$(GST_VERSION)/libgst*.so \
 		$(1)/usr/lib/gstreamer-$(GST_VERSION)/ \
 	)
+	$(INSTALL_DIR) $(1)/usr/libexec/gstreamer-$(GST_VERSION)
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/libexec/gstreamer-$(GST_VERSION)/gst-plugin-scanner \
-		       $(1)/usr/lib/gstreamer-$(GST_VERSION)
+		       $(1)/usr/libexec/gstreamer-$(GST_VERSION)
 endef
 
 

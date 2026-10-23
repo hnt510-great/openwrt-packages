@@ -13,7 +13,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=boost
 PKG_VERSION:=1.91.0
 PKG_SOURCE_VERSION:=1_91_0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)_$(PKG_SOURCE_VERSION).tar.bz2
 PKG_SOURCE_URL:=https://archives.boost.io/release/$(PKG_VERSION)/source @SF/$(PKG_NAME)/$(PKG_NAME)/$(PKG_VERSION)
@@ -336,7 +336,7 @@ define DefineBoostLibrary
 endef
 
 $(eval $(call DefineBoostLibrary,atomic))
-$(eval $(call DefineBoostLibrary,charconv,,,,$(if $(filter i386 x86_64 powerpc powerpc64,$(ARCH)),libquadmath)))
+$(eval $(call DefineBoostLibrary,charconv,,+TARGET_x86:libquadmath))
 $(eval $(call DefineBoostLibrary,chrono))
 $(eval $(call DefineBoostLibrary,cobalt,container context date_time,,,libopenssl))
 $(eval $(call DefineBoostLibrary,container))

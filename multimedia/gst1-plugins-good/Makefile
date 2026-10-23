@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=gst1-plugins-good
 PKG_VERSION:=1.28.7
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=gst-plugins-good-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://gstreamer.freedesktop.org/src/gst-plugins-good/
@@ -27,8 +27,10 @@ include $(INCLUDE_DIR)/nls.mk
 include $(INCLUDE_DIR)/meson.mk
 
 PKG_CONFIG_DEPENDS:= \
+	CONFIG_PACKAGE_gst1-mod-id3demux \
 	CONFIG_PACKAGE_gst1-mod-lame \
-	CONFIG_PACKAGE_gst1-mod-mpg123
+	CONFIG_PACKAGE_gst1-mod-mpg123 \
+	CONFIG_PACKAGE_gst1-mod-pulse
 
 GST_GOOD_MODULES:=
 
@@ -212,7 +214,7 @@ define GstBuildPlugin
   define Package/gst1-mod-$(1)/install
 	$(INSTALL_DIR) $$(1)/usr/lib/gstreamer-$(GST_VERSION)
 	( cd $(PKG_INSTALL_DIR); $(CP) \
-		./usr/lib/gstreamer-$(GST_VERSION)/libgst$(1).so* \
+		./usr/lib/gstreamer-$(GST_VERSION)/libgst$(if $(filter pulse,$(1)),pulseaudio,$(1)).so* \
 		$$(1)/usr/lib/gstreamer-$(GST_VERSION)/ \
 	)
   endef
@@ -279,7 +281,7 @@ $(eval $(call GstBuildPlugin,navigationtest,navigationtest support,video,,))
 $(eval $(call GstBuildPlugin,oss4,OSS 4 audio support,audio tag,,))
 $(eval $(call GstBuildPlugin,ossaudio,OSS audio support,audio,,))
 $(eval $(call GstBuildPlugin,png,png support,video,,+libpng))
-#$(eval $(call GstBuildPlugin,pulse,pulse support,audio pbutils tag video,,+pulseaudio))
+$(eval $(call GstBuildPlugin,pulse,PulseAudio protocol support,audio pbutils tag video,,+libpulse))
 $(eval $(call GstBuildPlugin,shout2,shout2 support,audio,,+libshout))
 $(eval $(call GstBuildPlugin,soup,soup input,audio tag,,+libsoup3))
 $(eval $(call GstBuildPlugin,speex,speex support,audio tag,,+libspeex))

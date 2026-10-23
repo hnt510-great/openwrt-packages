@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=pulseaudio
 # last release tag reachable from PKG_SOURCE_VERSION
 PKG_VERSION:=17.0
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://gitlab.freedesktop.org/pulseaudio/pulseaudio.git
@@ -83,7 +83,7 @@ endef
 define Package/pulseaudio-tools
   SECTION:=sound
   CATEGORY:=Sound
-  DEPENDS:=+libsndfile pulseaudio
+  DEPENDS:=+libsndfile +libpulse
   TITLE:=Tools for Pulseaudio
   URL:=https://www.freedesktop.org/wiki/Software/PulseAudio/
   VARIANT:=noavahi
