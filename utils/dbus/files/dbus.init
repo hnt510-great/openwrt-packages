@@ -3,6 +3,16 @@
 
 START=60
 
+# Native systemd owns the system bus. Package postinst/reload calls must not
+# create a second procd daemon that replaces its listening socket.
+if [ -z "$IPKG_INSTROOT" ] && [ -d /run/systemd/system ] &&
+   [ -f /usr/lib/systemd/system/dbus.service ]; then
+	case "$action" in
+		boot|start|restart|reload) exec /usr/bin/systemctl start dbus.service ;;
+		stop|shutdown) exit 0 ;;
+	esac
+fi
+
 USE_PROCD=1
 PROG=/usr/bin/dbus-daemon
 
