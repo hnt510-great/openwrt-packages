@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=podman
-PKG_VERSION:=5.8.4
-PKG_RELEASE:=7
+PKG_VERSION:=6.1.2
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://github.com/podman-container-tools/podman/archive/v$(PKG_VERSION)
-PKG_HASH:=be01c20923ed7642a5ad039f83252e3b7d09f0e3431d01284a5beff6c123671c
+PKG_HASH:=a4b2b10bd560cf9b4c50c282bd04bb74486ff6c78bebd51427f779fe985fc1bb
 
 PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
@@ -22,13 +22,6 @@ PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 include $(INCLUDE_DIR)/package.mk
 include ../../lang/golang/golang-package.mk
 
-define Download/default-registries
-  URL:=https://raw.githubusercontent.com/projectatomic/registries/da9a9c87781823f45401ca49da04e269c9e3100e
-  URL_FILE:=registries.fedora
-  FILE:=registries.fedora-da9a9c8778
-  HASH:=bc2b58c209aa8ca35b6814ec9a3c64716d4970b884ade460b65000e56024dfee
-endef
-
 define Download/default-policy
   URL:=https://raw.githubusercontent.com/containers/skopeo/362f70b056a1f5d2bd4184527a0ae0d20c4d35d3
   URL_FILE:=default-policy.json
@@ -42,8 +35,8 @@ define Package/podman
   TITLE:=Podman
   URL:=https://podman.io
   DEPENDS:=$(GO_ARCH_DEPENDS) +conmon +libgpgme +libseccomp +nsenter \
-	+zoneinfo-simple +kmod-veth +slirp4netns +netavark +aardvark-dns \
-	+catatonit +crun +OPENWRT_SYSTEMD:libsystemd +OPENWRT_SYSTEMD:passt +kmod-tun \
+	+zoneinfo-simple +kmod-veth +passt +netavark +aardvark-dns \
+	+catatonit +crun +OPENWRT_SYSTEMD:libsystemd +kmod-tun \
 	+shadow-newuidmap +shadow-newgidmap \
 	+PODMAN_SELINUX_SUPPORT:libselinux
 endef
@@ -82,6 +75,8 @@ MAKE_VARS += \
 	$(GO_GENERAL_BUILD_CONFIG_VARS) \
 	$(GO_PKG_BUILD_CONFIG_VARS) \
 	$(GO_PKG_VARS) \
+	GIT_COMMIT="" \
+	DESTDIR="$(PKG_INSTALL_DIR)" \
 	PREFIX=/usr \
 	LIBEXECDIR=/usr/lib \
 	LIBEXECPODMAN=/usr/lib/podman \
@@ -90,8 +85,15 @@ MAKE_VARS += \
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	$(eval $(call Download,default-registries))
 	$(eval $(call Download,default-policy))
+endef
+
+define Build/Compile
+	$(call Build/Compile/Default,binaries)
+endef
+
+define Build/Install
+	$(call Build/Compile/Default,install.bin $(if $(CONFIG_OPENWRT_SYSTEMD),install.systemd))
 endef
 
 ifneq ($(CONFIG_USE_MUSL),)
@@ -100,12 +102,13 @@ endif
 
 define Package/podman/install
 	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/lib/podman
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/{podman,podman-remote} $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/podman $(1)/usr/bin/
+	$(INSTALL_BIN) ./files/podman-remote.sh $(1)/usr/bin/podman-remote
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/lib/podman/{rootlessport,quadlet} $(1)/usr/lib/podman/
 	$(LN) podman $(1)/usr/bin/podmansh
 	$(INSTALL_DIR) $(1)/etc/containers
 	$(INSTALL_DATA) $(DL_DIR)/default-policy.json-362f70b056 $(1)/etc/containers/policy.json
-	$(INSTALL_DATA) $(DL_DIR)/registries.fedora-da9a9c8778 $(1)/etc/containers/registries.conf
+	$(INSTALL_DATA) ./files/default-registries.conf $(1)/etc/containers/registries.conf
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/vendor/go.podman.io/storage/storage.conf $(1)/etc/containers/storage.conf
 	$(INSTALL_DATA) ./files/containers.conf $(1)/etc/containers/containers.conf
 ifeq ($(CONFIG_OPENWRT_SYSTEMD),y)

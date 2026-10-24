@@ -41,12 +41,14 @@ define Package/gnupg2
   $(call Package/gnupg2/Default)
   MENU:=1
   ALTERNATIVES:=300:/usr/bin/gpg:/usr/bin/gpg2
+  PROVIDES:=gnupg
 endef
 
 define Package/gpgv2
   $(call Package/gnupg2/Default)
   TITLE:=GnuPG signature verification only (version 2)
   ALTERNATIVES:=300:/usr/bin/gpgv:/usr/bin/gpgv2
+  PROVIDES:=gpgv
 endef
 
 define Package/gnupg2-dirmngr
@@ -59,6 +61,7 @@ define Package/gnupg2-utils
   $(call Package/gnupg2/Default)
   DEPENDS:=gnupg2 +libcurl
   TITLE:=Key management utilities for GnuPG (version 2)
+  PROVIDES:=gnupg-utils
 endef
 
 define Package/gnupg2/description
