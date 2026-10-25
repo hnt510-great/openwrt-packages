@@ -32,8 +32,9 @@ PKG_CONFIG_DEPENDS += CONFIG_PACKAGE_spice-gtk
 # The introspection include below is conditional, but the package scan runs with
 # DUMP=1, which does not load .config. Declare the build dependencies here with
 # the metadata condition syntax so the target package installs
-# gobject-introspection-1.0.pc into staging before this package configures.
-PKG_BUILD_DEPENDS += PACKAGE_spice-gtk:gobject-introspection/host PACKAGE_spice-gtk:gobject-introspection
+# gobject-introspection-1.0.pc and GLib's GIR metadata into staging before this
+# package configures.
+PKG_BUILD_DEPENDS += PACKAGE_spice-gtk:gobject-introspection/host PACKAGE_spice-gtk:gobject-introspection PACKAGE_spice-gtk:glib2-gir
 ifneq ($(CONFIG_PACKAGE_spice-gtk),)
 include $(INCLUDE_DIR)/gobject-introspection.mk
 endif
