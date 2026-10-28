@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=json-glib
 PKG_VERSION:=1.10.8
-PKG_RELEASE:=1
+PKG_RELEASE:=4
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNOME/json-glib/$(basename $(PKG_VERSION))
@@ -24,6 +24,11 @@ OPENWRT_VERBOSE:=c
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/nls.mk
 include $(INCLUDE_DIR)/meson.mk
+PKG_CONFIG_DEPENDS+=CONFIG_PACKAGE_gtk4
+ifneq ($(CONFIG_PACKAGE_gtk4),)
+include $(INCLUDE_DIR)/gobject-introspection.mk
+PKG_BUILD_DEPENDS+=glib2-gir
+endif
 
 define Package/json-glib
   SECTION:=libs
@@ -42,7 +47,7 @@ endef
 
 MESON_ARGS += \
 	-Dgtk_doc=disabled \
-	-Dintrospection=disabled \
+	-Dintrospection=$(if $(CONFIG_PACKAGE_gtk4),enabled,disabled) \
 	-Dtests=false
 
 define Build/Prepare
@@ -65,12 +70,21 @@ define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/json-glib-1.0.pc \
 					$(1)/usr/lib/pkgconfig
+ifneq ($(CONFIG_PACKAGE_gtk4),)
+	$(INSTALL_DIR) $(1)/usr/share/gir-1.0 $(1)/usr/lib/girepository-1.0
+	$(CP) $(PKG_INSTALL_DIR)/usr/share/gir-1.0/. $(1)/usr/share/gir-1.0/
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/. $(1)/usr/lib/girepository-1.0/
+endif
 endef
 
 define Package/json-glib/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libjson-glib-1.0.so.$(ABI_VERSION)* \
 						$(1)/usr/lib
+ifneq ($(CONFIG_PACKAGE_gtk4),)
+	$(INSTALL_DIR) $(1)/usr/lib/girepository-1.0
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/. $(1)/usr/lib/girepository-1.0/
+endif
 endef
 
 $(eval $(call BuildPackage,json-glib))

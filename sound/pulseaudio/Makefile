@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=pulseaudio
 # last release tag reachable from PKG_SOURCE_VERSION
 PKG_VERSION:=17.0
-PKG_RELEASE:=5
+PKG_RELEASE:=8
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://gitlab.freedesktop.org/pulseaudio/pulseaudio.git
@@ -25,6 +25,10 @@ PKG_LICENSE_FILES:=GPL LICENSE
 PKG_CPE_ID:=cpe:/a:pulseaudio:pulseaudio
 
 PKG_BUILD_FLAGS:=no-mips16
+PKG_CONFIG_DEPENDS:=CONFIG_PACKAGE_libpulse-mainloop-glib
+ifneq ($(CONFIG_PACKAGE_libpulse-mainloop-glib),)
+PKG_BUILD_DEPENDS+=glib2
+endif
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/nls.mk
@@ -89,6 +93,14 @@ define Package/pulseaudio-tools
   VARIANT:=noavahi
 endef
 
+define Package/libpulse-mainloop-glib
+  SECTION:=lib
+  CATEGORY:=Libraries
+  DEPENDS:=+libpulse +glib2
+  TITLE:=GLib main loop integration for PulseAudio clients
+  URL:=https://www.freedesktop.org/wiki/Software/PulseAudio/
+endef
+
 define Package/pulseaudio-profiles
   SECTION:=sound
   CATEGORY:=Sound
@@ -117,7 +129,7 @@ MESON_ARGS += \
 	-Dbluez5-ofono-headset=false \
 	-Ddbus=enabled \
 	-Dfftw=disabled \
-	-Dglib=disabled \
+	-Dglib=$(if $(CONFIG_PACKAGE_libpulse-mainloop-glib),enabled,disabled) \
 	-Dgsettings=disabled \
 	-Dgstreamer=disabled \
 	-Dgtk=disabled \
@@ -176,6 +188,14 @@ define Build/InstallDev
 	$(SED) 's,/usr/lib,$$$${exec_prefix}/lib,g' $(1)/usr/lib/pkgconfig/libpulse.pc
 	$(SED) 's,/usr/include,$$$${prefix}/include,g' $(1)/usr/lib/pkgconfig/libpulse-simple.pc
 	$(SED) 's,/usr/lib,$$$${exec_prefix}/lib,g' $(1)/usr/lib/pkgconfig/libpulse-simple.pc
+	if [ -f $(1)/usr/lib/pkgconfig/libpulse-mainloop-glib.pc ]; then \
+		$(SED) 's,/usr/include,$$$${prefix}/include,g;s,/usr/lib,$$$${exec_prefix}/lib,g' $(1)/usr/lib/pkgconfig/libpulse-mainloop-glib.pc; \
+	fi
+	# Cross linkers need a build-time search path for libpulsecommon. Its
+	# runtime location remains /usr/lib/pulseaudio in the client libraries.
+	for pc in $(1)/usr/lib/pkgconfig/libpulse*.pc; do \
+		$(SED) 's|^Libs:.*|& -Wl,-rpath-link,$$$${libdir}/pulseaudio|' $$$$pc; \
+	done
 
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/*.so* $(1)/usr/lib/
@@ -191,6 +211,11 @@ define Package/libpulse/install
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libpulse.so* $(1)/usr/lib/
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libpulse-simple.so* $(1)/usr/lib/
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pulseaudio/libpulsecommon-*.so $(1)/usr/lib/pulseaudio/
+endef
+
+define Package/libpulse-mainloop-glib/install
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libpulse-mainloop-glib.so.* $(1)/usr/lib/
 endef
 
 define Package/pulseaudio-daemon/install
@@ -234,6 +259,7 @@ define Package/pulseaudio-profiles/install
 endef
 
 $(eval $(call BuildPackage,libpulse))
+$(eval $(call BuildPackage,libpulse-mainloop-glib))
 $(eval $(call BuildPackage,pulseaudio-daemon))
 $(eval $(call BuildPackage,pulseaudio-daemon-avahi))
 $(eval $(call BuildPackage,pulseaudio-tools))

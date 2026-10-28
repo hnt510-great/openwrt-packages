@@ -1,0 +1,43 @@
+Subject: Use the configured executable emulator for source generation
+
+The x86_64 glibc build runs target generators with an isolated matching
+loader. CMake prefixes the target command with CMAKE_CROSSCOMPILING_EMULATOR.
+Also avoid literal shell quotes in the scanner compiler environment.
+
+--- a/src/libical-glib/CMakeLists.txt
++++ b/src/libical-glib/CMakeLists.txt
+@@ -72,17 +72,7 @@
+   list(APPEND xml_files ${xml_file_fullpath})
+ endforeach()
+ 
+-if(CMAKE_CROSSCOMPILING)
+-  # import native ical-glib-src-generator when cross-compiling
+-  set(IMPORT_ICAL_GLIB_SRC_GENERATOR "ICAL_GLIB_SRC_GENERATOR-NOTFOUND"
+-    CACHE FILEPATH
+-    "Path to exported ical-glib-src-generator target from native build"
+-  )
+-  include(${IMPORT_ICAL_GLIB_SRC_GENERATOR})
+-  set(ical-glib-src-generator_EXE native-ical-glib-src-generator)
+-else()
+-  set(ical-glib-src-generator_EXE ical-glib-src-generator)
+-endif()
++set(ical-glib-src-generator_EXE ical-glib-src-generator)
+ 
+ list(
+   APPEND
+--- a/cmake/modules/GObjectIntrospectionMacros.cmake
++++ b/cmake/modules/GObjectIntrospectionMacros.cmake
+@@ -50,7 +50,7 @@
+     set(_gir_libtool "--no-libtool")
+ 
+     add_custom_command(
+-      COMMAND ${CMAKE_COMMAND} -E env "CC='${CMAKE_C_COMPILER}'"
++      COMMAND ${CMAKE_COMMAND} -E env "CC=${CMAKE_C_COMPILER}"
+               ${GObjectIntrospection_SCANNER}
+               ${GObjectIntrospection_SCANNER_ARGS}
+               --namespace=${_gir_namespace}
+--- a/src/libical-glib/CMakeLists.txt
++++ b/src/libical-glib/CMakeLists.txt
+@@ -174,1 +174,1 @@
+-  set(ICalGLib_${LIB_VERSION}_gir_SCANNERFLAGS "--warn-all")
++  set(ICalGLib_${LIB_VERSION}_gir_SCANNERFLAGS "--warn-all" "--extra-library=ical")

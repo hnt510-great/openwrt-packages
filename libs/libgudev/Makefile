@@ -2,7 +2,8 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libgudev
 PKG_VERSION:=238
-PKG_RELEASE:=1
+PKG_RELEASE:=4
+PKG_CONFIG_DEPENDS:=CONFIG_PACKAGE_gtk4
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNOME/$(PKG_NAME)/$(PKG_VERSION)
@@ -17,6 +18,11 @@ PKG_BUILD_DEPENDS:=glib2/host
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/meson.mk
 include $(INCLUDE_DIR)/nls.mk
+
+ifneq ($(CONFIG_PACKAGE_gtk4),)
+PKG_BUILD_DEPENDS+=glib2-gir
+include $(INCLUDE_DIR)/gobject-introspection.mk
+endif
 
 define Package/libgudev
   SECTION:=libs
@@ -34,7 +40,7 @@ endef
 
 MESON_ARGS += \
 	-Dtests=disabled \
-	-Dintrospection=disabled \
+	-Dintrospection=$(if $(CONFIG_PACKAGE_gtk4),enabled,disabled) \
 	-Dvapi=disabled \
 	-Dgtk_doc=false
 
@@ -45,11 +51,15 @@ define Build/InstallDev
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/*.so* $(1)/usr/lib
 	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/*.pc $(1)/usr/lib/pkgconfig
+	$(if $(CONFIG_PACKAGE_gtk4),$(INSTALL_DIR) $(1)/usr/share/gir-1.0 $(1)/usr/lib/girepository-1.0)
+	$(if $(CONFIG_PACKAGE_gtk4),$(CP) $(PKG_INSTALL_DIR)/usr/share/gir-1.0/. $(1)/usr/share/gir-1.0/)
+	$(if $(CONFIG_PACKAGE_gtk4),$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/. $(1)/usr/lib/girepository-1.0/)
 endef
 
 define Package/libgudev/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/*.so* $(1)/usr/lib
+	$(if $(CONFIG_PACKAGE_gtk4),$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0 $(1)/usr/lib/)
 endef
 
 $(eval $(call BuildPackage,libgudev))

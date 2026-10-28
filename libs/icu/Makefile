@@ -131,6 +131,8 @@ define Build/InstallDev
 	$(INSTALL_DIR) $(2)/bin
 	$(CP) $(PKG_INSTALL_DIR)/usr/include/* $(1)/usr/include/
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/* $(1)/usr/lib/
+	$(INSTALL_DIR) $(1)/usr/share/icu/$(PKG_VERSION)
+	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/share/icu/$(PKG_VERSION)/icudt*.dat $(1)/usr/share/icu/$(PKG_VERSION)/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/icu-config $(1)/usr/bin/
 	$(SED) 's,^\(prefix\|execprefix\)=.*,\1=$(STAGING_DIR)/usr,g' $(1)/usr/bin/icu-config
 	$(LN) $(STAGING_DIR)/usr/bin/icu-config $(2)/bin/

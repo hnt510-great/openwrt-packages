@@ -2,4 +2,14 @@
 set -eu
 [ ! -d /usr/share/glib-2.0/schemas ] || glib-compile-schemas /usr/share/glib-2.0/schemas
 [ ! -d /usr/lib/gio/modules ] || gio-querymodules /usr/lib/gio/modules
+if [ -x /usr/lib/gdk-pixbuf-query-loaders ] &&
+   [ -d /usr/lib/gdk-pixbuf-2.0/2.10.0/loaders ]; then
+	/usr/lib/gdk-pixbuf-query-loaders --update-cache
+fi
+if command -v gtk-query-immodules-3.0 >/dev/null 2>&1; then
+	gtk-query-immodules-3.0 --update-cache
+fi
+for modules in /usr/lib/gtk-4.0/*/immodules; do
+	[ ! -d "$modules" ] || gio-querymodules "$modules"
+done
 exit 0

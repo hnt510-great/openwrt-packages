@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libical
 PKG_VERSION:=3.0.20
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_HASH:=e73de92f5a6ce84c1b00306446b290a2b08cdf0a80988eca0a2c9d5c3510b4c2
@@ -21,6 +21,10 @@ PKG_LICENSE_FILES:=COPYING
 PKG_CPE_ID:=cpe:/a:libical_project:libical
 
 CMAKE_INSTALL:=1
+PKG_CONFIG_DEPENDS:=CONFIG_PACKAGE_libical-glib
+ifneq ($(CONFIG_PACKAGE_libical-glib),)
+PKG_BUILD_DEPENDS:=glib2/host glib2-gir gobject-introspection/host gobject-introspection libxml2
+endif
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -41,7 +45,23 @@ define Package/libical/description
  Libical implements RFC2445, RFC2446 and some of RFC2447.
 endef
 
-CMAKE_OPTIONS += -DWITH_CXX_BINDINGS=false -DICAL_BUILD_DOCS=false -DICAL_GLIB=false
+CMAKE_OPTIONS += -DWITH_CXX_BINDINGS=false -DICAL_BUILD_DOCS=false -DICAL_GLIB=$(if $(CONFIG_PACKAGE_libical-glib),true,false) \
+	-DGOBJECT_INTROSPECTION=$(if $(CONFIG_PACKAGE_libical-glib),true,false) \
+	-DICAL_GLIB_VAPI=false -DLIBICAL_BUILD_TESTING=false \
+	-DCMAKE_CROSSCOMPILING_EMULATOR=$(TOPDIR)/scripts/gi-target-runner
+
+define Package/libical-glib
+  SECTION:=libs
+  CATEGORY:=Libraries
+  TITLE:=GObject bindings and introspection for libical
+  DEPENDS:=@TARGET_x86_64 @USE_GLIBC +libical +glib2-gir
+endef
+
+define Package/libical-glib/install
+	$(INSTALL_DIR) $(1)/usr/lib/girepository-1.0
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libical-glib.so.* $(1)/usr/lib/
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/*.typelib $(1)/usr/lib/girepository-1.0/
+endef
 
 define Package/libical/install
 	$(INSTALL_DIR) $(1)/usr/lib
@@ -49,3 +69,5 @@ define Package/libical/install
 endef
 
 $(eval $(call BuildPackage,libical))
+
+$(eval $(call BuildPackage,libical-glib))

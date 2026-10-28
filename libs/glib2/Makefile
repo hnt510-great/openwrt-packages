@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=glib2
-PKG_VERSION:=2.88.1
-PKG_RELEASE:=5
+PKG_VERSION:=2.90.1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=glib-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNOME/glib/$(basename $(PKG_VERSION))
-PKG_HASH:=51ab804c56f6eab3e5045c774d1290ac5e4c923d4f9a3d8e33123bee45c1840e
+PKG_HASH:=93c941aa17d5eb1d53fe838365f29a8b4e539c222a256d974ec8f30fc413e396
 
 PKG_MAINTAINER:=Peter Wagner <tripolar@gmx.at>
 PKG_LICENSE:=LGPL-2.1-or-later
@@ -131,7 +131,11 @@ COMP_ARGS+=-Druntime_dir=/var/run
 # default feature=auto see meson_options.txt
 COMP_ARGS+=-Dlibelf=disabled
 
-MESON_HOST_ARGS += $(COMP_ARGS) -Dxattr=false -Dnls=disabled
+# PyGObject and Blueprint must share one GObject/GIRepository instance with
+# libraries opened through typelibs. A statically linked Python extension
+# otherwise creates a second type registry when GIRepository is imported.
+MESON_HOST_ARGS += $(COMP_ARGS) -Dxattr=false -Dnls=disabled -Ddefault_library=both
+HOST_LDFLAGS += -Wl,-rpath,$(STAGING_DIR_HOSTPKG)/lib
 MESON_ARGS += $(COMP_ARGS) -Dxattr=true -Db_lto=true -Dnls=$(if $(CONFIG_BUILD_NLS),en,dis)abled
 
 define Build/InstallDev

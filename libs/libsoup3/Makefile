@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libsoup3
 PKG_VERSION:=3.7.1
-PKG_RELEASE:=2
+PKG_RELEASE:=5
 
 PKG_SOURCE:=libsoup-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNOME/libsoup/$(basename $(PKG_VERSION))
@@ -24,6 +24,11 @@ PKG_BUILD_DEPENDS:=glib2/host
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/nls.mk
 include $(INCLUDE_DIR)/meson.mk
+PKG_CONFIG_DEPENDS+=CONFIG_PACKAGE_gtk4
+ifneq ($(CONFIG_PACKAGE_gtk4),)
+include $(INCLUDE_DIR)/gobject-introspection.mk
+PKG_BUILD_DEPENDS+=glib2-gir
+endif
 
 define Package/libsoup3
   SECTION:=libs
@@ -49,7 +54,7 @@ MESON_ARGS += \
 	-Dbrotli=disabled \
 	-Dzstd=$(if $(CONFIG_LIBSOUP3_ZSTD),enabled,disabled) \
 	-Dtls_check=false \
-	-Dintrospection=disabled \
+	-Dintrospection=$(if $(CONFIG_PACKAGE_gtk4),enabled,disabled) \
 	-Dvapi=disabled \
 	-Dtests=false \
 	-Dinstalled_tests=false \
@@ -73,6 +78,11 @@ define Build/InstallDev
 	$(INSTALL_DATA) \
 		$(PKG_INSTALL_DIR)/usr/include/libsoup-3.0/libsoup/*.h \
 		$(1)/usr/include/libsoup-3.0/libsoup/
+ifneq ($(CONFIG_PACKAGE_gtk4),)
+	$(INSTALL_DIR) $(1)/usr/share/gir-1.0 $(1)/usr/lib/girepository-1.0
+	$(CP) $(PKG_INSTALL_DIR)/usr/share/gir-1.0/. $(1)/usr/share/gir-1.0/
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/. $(1)/usr/lib/girepository-1.0/
+endif
 endef
 
 define Package/libsoup3/install
@@ -80,6 +90,10 @@ define Package/libsoup3/install
 	$(CP) \
 		$(PKG_INSTALL_DIR)/usr/lib/libsoup-3.0.* \
 		$(1)/usr/lib/
+ifneq ($(CONFIG_PACKAGE_gtk4),)
+	$(INSTALL_DIR) $(1)/usr/lib/girepository-1.0
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/girepository-1.0/. $(1)/usr/lib/girepository-1.0/
+endif
 endef
 
 $(eval $(call BuildPackage,libsoup3))
