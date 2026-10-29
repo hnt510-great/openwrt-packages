@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=nginx-util
 PKG_VERSION:=1.7
 # r4 is already allocated by the local APK migration ledger.
-PKG_RELEASE:=5
+PKG_RELEASE:=7
 PKG_MAINTAINER:=Peter Stadler <peter.stadler@student.uibk.ac.at>
 
 include $(INCLUDE_DIR)/package.mk
