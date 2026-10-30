@@ -112,6 +112,7 @@ define Package/openssh-server-pam
   DEPENDS+= +USE_GLIBC:libcrypt-compat +libopenssl +zlib +libpthread +openssh-keygen +libpam
   TITLE+= server (with PAM support)
   VARIANT:=with-pam
+  CONFLICTS:=openssh-server
   USERID:=sshd=22:sshd=22
 endef
 
