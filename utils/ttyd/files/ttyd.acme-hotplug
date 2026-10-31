@@ -1,0 +1,6 @@
+# Restart ttyd instances whose certificate changed after an ACME renewal.
+case "$ACTION" in
+renewed|issued)
+	[ -x /etc/init.d/ttyd ] && /etc/init.d/ttyd enabled && /etc/init.d/ttyd reload
+	;;
+esac

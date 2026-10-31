@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ttyd
 PKG_VERSION:=1.7.7
-PKG_RELEASE:=1
+PKG_RELEASE:=4
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/tsl0922/ttyd/tar.gz/$(PKG_VERSION)?
@@ -47,6 +47,10 @@ define Package/ttyd/install
 	$(INSTALL_CONF) ./files/ttyd.config $(1)/etc/config/ttyd
 	$(INSTALL_DIR) $(1)/etc/init.d/
 	$(INSTALL_BIN) ./files/ttyd.init $(1)/etc/init.d/ttyd
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/ttyd.uci-defaults $(1)/etc/uci-defaults/80-ttyd-https
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/acme
+	$(INSTALL_DATA) ./files/ttyd.acme-hotplug $(1)/etc/hotplug.d/acme/50-ttyd
 endef
 
 $(eval $(call BuildPackage,ttyd))

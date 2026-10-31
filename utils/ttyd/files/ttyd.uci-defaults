@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Serve ttyd over TLS when LuCI is served over HTTPS, otherwise browsers
+# block the embedded http:// terminal as mixed content. Only sections
+# without an explicit ssl setting are changed.
+
+[ -n "$(uci -q get uhttpd.main.listen_https)" ] || exit 0
+
+for section in $(uci -q show ttyd | sed -n 's/^ttyd\.\([^.=]*\)=ttyd$/\1/p'); do
+	[ -n "$(uci -q get "ttyd.$section.ssl")" ] && continue
+	uci -q set "ttyd.$section.ssl=1"
+done
+
+uci -q commit ttyd
+exit 0
