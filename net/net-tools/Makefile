@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=net-tools
 PKG_VERSION:=2.10
-PKG_RELEASE:=2
+PKG_RELEASE:=5
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://sourceforge.net/projects/net-tools/files/
@@ -85,6 +85,10 @@ endef
 define Build/Configure
 	# Failed configure.sh leaves stub config.h around.
 	rm -f $(PKG_BUILD_DIR)/config.h
+	# Linux 7.3 removed the ROSE UAPI header; drop ROSE support without it.
+	[ -f "$(TOOLCHAIN_DIR)/include/linux/rose.h" ] || \
+		$(SED) 's/^\(bool .* HAVE_\(AF\|HW\)ROSE\) y$$$$/\1 n/' \
+			$(PKG_BUILD_DIR)/config.in
 	( cd $(PKG_BUILD_DIR); yes $$$$'\n' | ./configure.sh config.in )
 endef
 
