@@ -19,6 +19,8 @@ include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/meson.mk
 include $(INCLUDE_DIR)/nls.mk
 
+# Metadata scans ignore .config, so declare the GIR build deps conditionally.
+PKG_BUILD_DEPENDS += PACKAGE_gtk4:gobject-introspection/host PACKAGE_gtk4:gobject-introspection PACKAGE_gtk4:glib2-gir
 ifneq ($(CONFIG_PACKAGE_gtk4),)
 PKG_BUILD_DEPENDS+=glib2-gir
 include $(INCLUDE_DIR)/gobject-introspection.mk
