@@ -181,7 +181,7 @@ CONFIGURE_ARGS += --disable-ocsp
 endif
 
 ifneq ($(CONFIG_GNUTLS_TPM),y)
-CONFIGURE_ARGS += --without-tpm
+CONFIGURE_ARGS += --without-tpm --without-tpm2
 endif
 
 ifeq ($(CONFIG_GNUTLS_CRYPTODEV),y)
