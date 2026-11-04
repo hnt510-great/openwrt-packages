@@ -1,5 +1,7 @@
 # OpenWrt 通用软件包 feed
 
+**简体中文** | [English](README.en.md)
+
 本仓库是 [hnt510-great/openwrt](https://github.com/hnt510-great/openwrt) 定制主树使用的私有源码 feed。
 项目面向 x86_64/glibc、APK、原生 systemd 和 GNOME 桌面；软件选择以主树
 保存的完整配置为准。
@@ -24,8 +26,7 @@
 | Web 终端 | ttyd 复用 LuCI/uhttpd 证书、配置变更和证书续期时的重载逻辑 |
 | 桌面应用兼容 | Flatpak 所需的 GnuPG、FUSE 等依赖与本机开发工具链配套 |
 
-当前桌面配置使用 GNOME。早期 Weston 文档记录的是历史实现与当时的验证，
-不应据此覆盖当前配置。GNOME 会话、libvirt 管理、APK ABI 检查和发布编排
+当前桌面配置使用 GNOME。GNOME 会话、libvirt 管理、APK ABI 检查和发布编排
 还依赖主树，单独 clone 本 feed 不会得到完整可构建固件。
 
 ## 获取与构建
