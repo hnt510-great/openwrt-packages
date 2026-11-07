@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libsoup3
 PKG_VERSION:=3.7.1
-PKG_RELEASE:=5
+PKG_RELEASE:=7
 
 PKG_SOURCE:=libsoup-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNOME/libsoup/$(basename $(PKG_VERSION))

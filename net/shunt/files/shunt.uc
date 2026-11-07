@@ -14,8 +14,10 @@ import { openlog, syslog, LOG_PID, LOG_DAEMON, LOG_ERR, LOG_WARNING,
 import { load as cfg_load, parse as cfg_parse, MIN as cfg_min } from 'shunt.config';
 import { compile as match_compile } from 'shunt.match';
 import { load as files_load, DIR as FILES_DIR } from 'shunt.list_file';
-import { action_name, compile as nft_compile, refresh, teardown, TABLE } from 'shunt.nft';
-import { compile as route_compile } from 'shunt.route';
+import { action_name, compile as nft_compile, flip as nft_flip, active as nft_active,
+	refresh, teardown,
+	addr_family, TABLE } from 'shunt.nft';
+import { compile as route_compile, state_ops as route_state_ops } from 'shunt.route';
 import { open as rt_open, exec as rt_exec, describe as rt_describe } from 'shunt.rt';
 import { open as snoop_open, observe, RECV_LEN } from 'shunt.snoop';
 import { names as poll_names, plan as poll_plan,
@@ -24,6 +26,8 @@ import { names as poll_names, plan as poll_plan,
 import { resolve as netifd_resolve } from 'shunt.netifd';
 import { tproxy as tproxy_available, br_netfilter, ipv6 } from 'shunt.probe';
 import { create as dedupe_create } from 'shunt.dedupe';
+import { TRACK, echo as track_echo, reply as track_reply, step as track_step,
+	targets as track_targets, open as track_open } from 'shunt.track';
 
 const RT_TABLES = '/etc/iproute2/rt_tables.d/shunt.conf';
 const TAG = 'shunt';
@@ -231,15 +235,17 @@ function policy_devices(policies) {
 	let seen = {}, out = [];
 
 	for (let p in (policies ?? [])) {
-		let dev = p.interface;
-
 		// bypass policies route into nothing - rp_filter does not apply.
 		if (action_name(p.action) != 'route')
 			continue;
 
-		if (length(dev ?? '') && !seen[dev]) {
-			seen[dev] = true;
-			push(out, dev);
+		for (let mb in (p.members ?? [ { dev: p.interface } ])) {
+			let dev = mb.dev;
+
+			if (length(dev ?? '') && !seen[dev]) {
+				seen[dev] = true;
+				push(out, dev);
+			}
 		}
 	}
 
@@ -288,6 +294,35 @@ function check_rp_filter(policies) {
 			dev, dev));
 }
 
+// Link state of every configured policy interface as netifd reports it:
+// false when it is down, null when netifd does not manage it.
+function link_state(policies) {
+	let link = {};
+
+	for (let p in (policies ?? []))
+		for (let mb in (p.members ?? []))
+			if (mb.name != null)
+				link[mb.name] = mb.up;
+
+	return link;
+}
+
+// An interface is dead when netifd has it down or the probes do not get
+// through it; either way its policies move on to the next one.
+function dead_of(link, alive) {
+	let dead = {};
+
+	for (let n in keys(link ?? {}))
+		if (link[n] === false)
+			dead[n] = true;
+
+	for (let n in keys(alive ?? {}))
+		if (alive[n] === false)
+			dead[n] = true;
+
+	return dead;
+}
+
 // silent: build only what a teardown consumes and say nothing about the
 // configuration - flush() needs route.del and nothing else.
 function build_state(silent) {
@@ -316,20 +351,23 @@ function build_state(silent) {
 	// A teardown renders without the check: a policy whose module has
 	// gone since it was applied still owns a table and rules to remove.
 	// Kept, so a refresh renders against the same set of policies.
+	let link = link_state(cfg.policies);
 	let opts = { tproxy: silent ? true : tproxy_available(cfg.policies),
-		br_netfilter: silent ? [] : br_netfilter(), ipv6: ipv6() };
+		br_netfilter: silent ? [] : br_netfilter(), ipv6: ipv6(),
+		track: length(cfg.global.track_ips) > 0, dead: dead_of(link, {}) };
 	let n = nft_compile(cfg.policies, opts);
 	if (!silent)
 		report('nft', n.issues);
 
-	let r = route_compile(cfg.policies, n.marks, opts);
+	let r = route_compile(cfg.policies, n.marks, { ...opts, probes: n.probes });
 	if (!silent) {
 		report('route', r.issues);
 		if (!opts.ipv6)
 			log('info', 'no IPv6 in this kernel - IPv6 routes and rules skipped');
 	}
 
-	return { cfg, matcher, files, opts, nft: n, route: r };
+	return { cfg, matcher, files, opts, nft: n, route: r, resolved: cfg.policies,
+		link, alive: {} };
 }
 
 // nft -f reads the entire ruleset before resolving a single name, so on a box
@@ -403,6 +441,70 @@ function drain_writes(st) {
 		st.interval = want;
 		st.timer.set(want * 1000);
 	}
+}
+
+// The route renderer needs the probe tables the nft renderer numbered.
+function route_opts(state) {
+	return { ...state.opts, probes: state.nft.probes };
+}
+
+// Link or probe state changed. Interfaces that became dead or alive are
+// handled as one batch: the mark chains of the affected policies are refilled
+// for the interface now in use, and the default routes of the changed
+// interfaces taken out or put back - unless the caller renders every route
+// anyway. All is rendered again for the keeper, a re-apply after an outside
+// flush, and the next interface event.
+function apply_dead(state, wq, routes) {
+	let dead = dead_of(state.link, state.alive);
+	let changed = [];
+
+	for (let n in keys({ ...dead, ...state.opts.dead }))
+		if (!!dead[n] != !!state.opts.dead[n])
+			push(changed, n);
+
+	if (!length(changed))
+		return;
+
+	let before = nft_active(state.nft.chains, state.opts.dead);
+
+	state.opts.dead = dead;
+
+	let n = nft_compile(state.cfg.policies, state.opts);
+	let batch = nft_flip(n.chains, dead);
+
+	state.nft = n;
+
+	if (length(batch) && !nft_pipe(batch, 'track'))
+		ensure_table(wq);
+
+	let after = nft_active(n.chains, dead);
+
+	for (let pn in sort(keys(after))) {
+		if (before[pn] === after[pn])
+			continue;
+
+		let p = filter(state.resolved, (x) => x.name == pn)[0];
+		let mb = (after[pn] != null) ? p?.members?.[after[pn]] : null;
+
+		log('notice', mb
+			? sprintf('policy %s: new connections use %s', pn, mb.name)
+			: sprintf('policy %s: no interface left - fallback %s', pn, p?.fallback ?? 'main'));
+	}
+
+	if (!routes)
+		return;
+
+	let rt = rtnl();
+
+	for (let name in changed)
+		for (let op in route_state_ops(state.resolved, n.marks, route_opts(state), name)) {
+			let why = rt ? rt_exec(rt, op) : 'ucode-mod-rtnl missing';
+
+			if (why != null)
+				debug(sprintf('track: not applied: %s - %s', rt_describe(op), why));
+		}
+
+	state.route = route_compile(state.resolved, n.marks, route_opts(state));
 }
 
 function run() {
@@ -569,7 +671,7 @@ function run() {
 			pending = null;
 
 			let resolved = netifd_resolve(state.cfg.policies, netifd_dump());
-			let r = route_compile(resolved, state.nft.marks, state.opts);
+			let r = route_compile(resolved, state.nft.marks, route_opts(state));
 
 			report('route', r.issues);
 
@@ -583,10 +685,26 @@ function run() {
 
 			check_rp_filter(resolved);
 
+			state.resolved = resolved;
+			state.link = link_state(resolved);
+
+			// The mark chains follow the new link state now; the routes are
+			// rendered below as a whole, with the new state in them.
+			apply_dead(state, wq, false);
+			r = route_compile(resolved, state.nft.marks, route_opts(state));
+
 			rt_quiet(state.route.del);
 			rt_quiet(r.add);
 
 			state.route = r;
+
+			for (let h in (stats.track ?? []))
+				for (let p in resolved)
+					for (let mb in (p.members ?? []))
+						if (mb.name == h.name && mb.dev != h.dev) {
+							h.rebind = true;
+							h.dev = mb.dev;
+						}
 		}
 
 		c.listener('network.interface', (type, msg) => {
@@ -602,13 +720,27 @@ function run() {
 				pending = uloop.timer(500, rebuild_routes);
 		});
 
+		function track_status() {
+			if (!length(stats.track ?? []))
+				return null;
+
+			let devs = {};
+
+			for (let h in stats.track)
+				devs[h.name] = { dev: h.dev, alive: h.alive, since: h.since };
+
+			return { interval: TRACK.interval, down: TRACK.down, up: TRACK.up,
+				targets: state.cfg.global.track_ips, devices: devs };
+		}
+
 		// Must be total: an exception in a ubus handler halts uloop and takes
 		// snoop, poll and the keeper down with the reply.
 		function status_reply() {
 			let names = [];
 
 			for (let m in state.nft.marks)
-				push(names, m.name);
+				if (!m.member)
+					push(names, m.name);
 
 			return {
 				started: stats.started,
@@ -625,7 +757,10 @@ function run() {
 				},
 				reapplied: stats.reapplied,
 				dedupe: cache.size(),
-				files: stats.files
+				files: stats.files,
+				track: track_status(),
+				active: nft_active(state.nft.chains, state.opts.dead),
+				down: filter(keys(state.link), (n) => state.link[n] === false)
 			};
 		}
 
@@ -710,6 +845,111 @@ function run() {
 		}
 	}
 
+	// One probe round every TRACK.interval seconds. A round is judged when the
+	// next one starts, so a reply has the whole interval to arrive; the
+	// device is alive for the round if any target answered.
+	let tracked = [];
+
+	if (state.opts.track && length(state.nft.probes)) {
+		let sock = require('socket');
+		let tg = track_targets(state.cfg.global.track_ips, addr_family, state.opts.ipv6);
+
+		for (let pr in state.nft.probes)
+			push(tracked, { name: pr.name, dev: pr.dev, mark: pr.mark, alive: true, good: 0,
+				bad: 0, seq: 0, got: false, sent: false, since: time(),
+				socks: {}, err: null });
+
+		function close_sock(h, fam) {
+			let k = h.socks[fam];
+
+			if (!k)
+				return;
+
+			k.handle.delete();
+			k.s.close();
+			delete h.socks[fam];
+		}
+
+		function round() {
+			for (let h in tracked) {
+				if (h.sent) {
+					let change = track_step(h, h.got);
+
+					if (change) {
+						h.since = time();
+						log('notice', (change == 'down')
+							? sprintf('track: %s does not answer - its policies fall back until it does', h.name)
+							: sprintf('track: %s answers again - its policies are back on it', h.name));
+						state.alive[h.name] = h.alive;
+						apply_dead(state, wq, true);
+					}
+				}
+
+				h.got = false;
+				h.seq = (h.seq + 1) & 0xffff;
+				h.sent = true;
+
+				// The device behind the name changed on an interface event.
+				if (h.rebind) {
+					h.rebind = false;
+					close_sock(h, '4');
+					close_sock(h, '6');
+				}
+
+				for (let fam in [ '4', '6' ]) {
+					if (!length(tg[fam]))
+						continue;
+
+					if (!h.socks[fam]) {
+						let o = track_open(sock, h.dev, fam, h.mark);
+
+						if (!o.s) {
+							if (h.err != o.err)
+								debug(sprintf('track: %s: %s', h.dev, o.err));
+							h.err = o.err;
+							continue;
+						}
+
+						h.err = null;
+
+						// Each handler closes over its own entry and family.
+						let s = o.s, f = fam, hh = h;
+
+						h.socks[fam] = { s, handle: uloop.handle(s, () => {
+							let d;
+
+							while ((d = s.recv(1500, sock.MSG_DONTWAIT)) != null)
+								if (track_reply(f, d) == hh.seq)
+									hh.got = true;
+						}, uloop.ULOOP_READ) };
+					}
+
+					for (let a in tg[fam]) {
+						let ok = h.socks[fam].s.send(track_echo(fam, h.seq), 0, {
+							family: (fam == '4') ? sock.AF_INET : sock.AF_INET6,
+							address: a });
+
+						// A device that went away or came back under a new
+						// index fails the send; the next round binds afresh.
+						if (ok == null) {
+							close_sock(h, fam);
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		round();
+		uloop.interval(TRACK.interval * 1000, round);
+
+		log('info', sprintf('track: %s, %d target(s) every %ds',
+			join(', ', map(tracked, (h) => h.name)),
+			length(state.cfg.global.track_ips), TRACK.interval));
+	}
+
+	stats.track = tracked;
+
 	log('notice', sprintf('started: %d polic%s, mask 0x%08x',
 		length(state.nft.marks), length(state.nft.marks) == 1 ? 'y' : 'ies',
 		0xff000000));
@@ -719,6 +959,9 @@ function run() {
 	log('notice', 'stopping');
 	for (let sock in socks)
 		sock.close();
+	for (let h in tracked)
+		for (let fam in keys(h.socks))
+			h.socks[fam].s.close();
 	flush(state);
 
 	return 0;
@@ -774,7 +1017,14 @@ function check() {
 		length(state.cfg.policies), length(state.nft.marks));
 
 	// A bypass policy has none of the three - printing them would render
-	// its nulls as a mark of 0 in table 0.
+	// its nulls as a mark of 0 in table 0. A policy with several interfaces
+	// has a line for each.
+	let many = {};
+
+	for (let m in state.nft.marks)
+		if (m.member > 0)
+			many[m.name] = true;
+
 	for (let m in state.nft.marks)
 		if (m.action == 'bypass')
 			printf('  %-16s bypass\n', m.name);
@@ -782,8 +1032,9 @@ function check() {
 			printf('  %-16s mark 0x%08x  table %d  pref %d  tproxy :%d\n',
 				m.name, m.mark, m.rt_table, m.rt_prio, m.port);
 		else
-			printf('  %-16s mark 0x%08x  table %d  pref %d\n',
-				m.name, m.mark, m.rt_table, m.rt_prio);
+			printf('  %-16s mark 0x%08x  table %d  pref %d%s\n',
+				m.name, m.mark, m.rt_table, m.rt_prio,
+				many[m.name] ? sprintf('  interface %d: %s', m.member + 1, m.iface) : '');
 
 	let total = length(state.files.issues) + length(state.matcher.issues) +
 		length(state.nft.issues) + length(state.route.issues);
@@ -792,6 +1043,10 @@ function check() {
 	printf('files:    %d file(s), %d pattern(s), %d address(es)\n',
 		state.files.files, state.files.entries, state.files.addresses);
 	printf('poll:     %d name(s)\n', length(poll_names(state.cfg.policies)));
+
+	for (let pr in state.nft.probes)
+		printf('track:    %-16s mark 0x%08x  table %d  pref %d\n',
+			pr.dev, pr.mark, pr.rt_table, pr.rt_prio);
 
 	return length(state.nft.marks) ? 0 : 2;
 }

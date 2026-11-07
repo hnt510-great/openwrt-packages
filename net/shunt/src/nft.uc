@@ -139,6 +139,26 @@ export function action_name(s) {
 	return ACTIONS[v] ? v : null;
 };
 
+// A policy's interfaces in order, resolved or as configured.
+function members_of(p) {
+	if (p?.members)
+		return p.members;
+
+	return (p?.interface != null) ? [ { name: p.interface, dev: p.interface } ] : [];
+}
+
+// The interface a policy's new flows go to: the first one that is not dead.
+// With all of them dead, a fallback 'main' policy marks nothing, so its
+// traffic takes the normal uplink; a 'block' one keeps the first one's mark,
+// whose table then holds only the prohibit route.
+function active_member(c, dead) {
+	for (let j = 0; j < length(c.members); j++)
+		if (!dead?.[c.members[j].name])
+			return j;
+
+	return (c.fallback == 'main') ? null : 0;
+}
+
 function mask_shift(mask) {
 	let n = 0;
 	while (n < 32 && !((mask >> n) & 1))
@@ -150,6 +170,41 @@ export function compile(policies, opts) {
 	let mask = opts?.mask ?? DEFAULTS.mask;
 	let shift = mask_shift(mask);
 	let capacity = mask >> shift;
+
+	// Health tracking probes every interface a route policy uses, each from
+	// a socket with a mark of its own that routes it through the interface's
+	// probe table. Those marks come from the top of the mask, so policy
+	// marks keep their numbers whether tracking is on or not. Keyed by the
+	// configured name, which stays when the device behind it changes.
+	let probes = [], probe_of = {};
+
+	if (opts?.track)
+		for (let p in (policies ?? [])) {
+			if (action_name(p?.action) != 'route')
+				continue;
+
+			for (let mb in members_of(p)) {
+				let name = mb?.name;
+
+				if (type(name) != 'string' || !length(name) || probe_of[name])
+					continue;
+
+				let n = length(probes) + 1;
+
+				probe_of[name] = { name, dev: mb.dev, mark: (capacity + 1 - n) << shift,
+					rt_table: 8500 + n, rt_prio: 30000 + n };
+				push(probes, probe_of[name]);
+			}
+		}
+
+	capacity -= length(probes);
+
+	// A route policy with several interfaces, and a tracked fallback 'main'
+	// one, marks new flows from a chain of its own, which the daemon fills
+	// with the mark of the interface in use - see active_member(). A flow
+	// keeps the mark it was born with, so a switch moves new flows only:
+	// masquerade resets a flow whose output interface changes.
+	let chains = {};
 	// Rule records, not strings: a MAC rule belongs in prerouting only, and
 	// both chains must render from one ordered list or precedence breaks.
 	let issues = [], marks = [], sets = [], rules4 = [], rules6 = [];
@@ -343,16 +398,27 @@ export function compile(policies, opts) {
 			continue;
 		}
 
-		// A bypass policy owns no mark, no table and no rule - it only ends
-		// evaluation - so it costs nothing from the mark capacity.
-		if (action != 'bypass' && ++idx > capacity) {
-			reject(pname, null,
-				sprintf('mark capacity exceeded (%d policies fit in mask 0x%08x)',
+		// Each interface of a route policy has a mark of its own, so a flow
+		// can stay on the interface it started on. A bypass policy owns no
+		// mark, no table and no rule - it only ends evaluation - so it costs
+		// nothing from the mark capacity.
+		let members = (action == 'route') ? members_of(p) : [];
+		let k = (length(members) > 1) ? length(members) : 1;
+
+		if (action != 'bypass' && idx + k > capacity) {
+			reject(pname, null, length(probes)
+				? sprintf('mark capacity exceeded (%d policy interfaces fit in mask 0x%08x beside %d tracked interface(s))',
+					capacity, mask, length(probes))
+				: sprintf('mark capacity exceeded (%d policy interfaces fit in mask 0x%08x)',
 					capacity, mask));
 			continue;
 		}
 
-		let mark = (action != 'bypass') ? idx << shift : null;
+		if (action != 'bypass')
+			idx += k;
+
+		let first = idx - k + 1;
+		let mark = (action != 'bypass') ? first << shift : null;
 		// One transport term for all three rule shapes. `th dport` reads the
 		// port at the transport header offset, which works for tcp and udp
 		// alike, so a port without a protocol needs no rule per protocol.
@@ -387,10 +453,19 @@ export function compile(policies, opts) {
 		// route also records the mark on the conntrack entry, so the flow's
 		// later packets can be marked from it without another lookup - see
 		// the restore rules below.
-		let setmark = (mark != null)
-			? sprintf('meta mark set (meta mark & 0x%08x) | 0x%08x ct mark set (ct mark & 0x%08x) | 0x%08x ',
-				~mask & 0xffffffff, mark, ~mask & 0xffffffff, mark)
-			: '';
+		let sm = (mk) => sprintf('meta mark set (meta mark & 0x%08x) | 0x%08x ct mark set (ct mark & 0x%08x) | 0x%08x ',
+			~mask & 0xffffffff, mk, ~mask & 0xffffffff, mk);
+		let setmark = (mark != null) ? sm(mark) : '';
+
+		let chain = null;
+		let fb = p.fallback ?? 'main';
+
+		if (action == 'route' && (k > 1 ||
+		    (probe_of[members[0]?.name] && fb == 'main'))) {
+			chain = `mk_${pname}`;
+			chains[pname] = { chain, fallback: fb, members: map(members,
+				(mb, j) => ({ name: mb.name, stmt: trim(sm((first + j) << shift)) })) };
+		}
 
 		// tproxy names the family of its address, so its statement exists
 		// once per family. When the socket lookup finds no listener the
@@ -400,6 +475,8 @@ export function compile(policies, opts) {
 		function stmt(fam) {
 			if (action == 'bypass')
 				return sprintf('%scounter return', l4);
+			if (chain)
+				return sprintf('%scounter goto %s', l4, chain);
 			if (action == 'tproxy')
 				return sprintf('%s%stproxy %s to %s:%s %scounter return', l4, fib,
 					fam == '4' ? 'ip' : 'ip6', TPROXY_ADDR[fam], tp_port, setmark);
@@ -450,11 +527,14 @@ export function compile(policies, opts) {
 		let rmark = sprintf('meta mark set (meta mark & 0x%08x) | 0x%08x ',
 			~mask & 0xffffffff, mark);
 
-		if (action == 'route') {
-			let r = sprintf('\t\t%s%scounter return', ctm, rmark);
-			push(restore, r);
-			push(restore_out, r);
-		}
+		if (action == 'route')
+			for (let j = 0; j < k; j++) {
+				let mj = (first + j) << shift;
+				let r = sprintf('\t\tct state != new ct direction original ct mark & 0x%08x == 0x%08x meta mark set (meta mark & 0x%08x) | 0x%08x counter return',
+					mask, mj, ~mask & 0xffffffff, mj);
+				push(restore, r);
+				push(restore_out, r);
+			}
 
 		// A proxied flow needs the statement on every packet, not only the
 		// mark: a udp proxy answers from a socket bound to the original
@@ -481,18 +561,26 @@ export function compile(policies, opts) {
 		// keep_local's main lookup keeps the band a released version already
 		// used, so an upgrade removes the old rule with the new one's del,
 		// and the policy table rule moves up out of the way.
-		let entry = (action == 'bypass')
-			? { name: pname, action, index: null, mark: null,
-				rt_table: null, rt_prio: null, rt_prio_local: null }
-			: { name: pname, action, index: idx, mark,
-				rt_table: 8000 + idx,
-				rt_prio: 31500 + idx,
-				rt_prio_local: 31000 + idx };
+		if (action == 'bypass')
+			push(marks, { name: pname, action, index: null, mark: null,
+				rt_table: null, rt_prio: null, rt_prio_local: null });
+		else
+			for (let j = 0; j < k; j++) {
+				let ix = first + j;
+				let entry = { name: pname, action, index: ix, mark: ix << shift,
+					rt_table: 8000 + ix,
+					rt_prio: 31500 + ix,
+					rt_prio_local: 31000 + ix };
 
-		if (action == 'tproxy')
-			entry.port = +tp_port;
+				if (action == 'tproxy')
+					entry.port = +tp_port;
+				else {
+					entry.member = j;
+					entry.iface = members[j]?.name;
+				}
 
-		push(marks, entry);
+				push(marks, entry);
+			}
 
 		if (has_mac)
 			push(sets, sprintf(
@@ -620,10 +708,29 @@ export function compile(policies, opts) {
 		? [ '\t\tct state != new counter return' ] : [];
 	let settled_out = length(restore_out) ? settled : [];
 
+	// A probe leaves with its mark set and must keep it: a track_ip inside
+	// a policy's destinations would otherwise be re-marked into that
+	// policy's table.
+	let guards = map(probes, (pr) => sprintf(
+		'\t\tmeta mark & 0x%08x == 0x%08x counter return', mask, pr.mark));
+
+	let mkchains = [];
+
+	for (let n in sort(keys(chains))) {
+		let c = chains[n];
+		let j = active_member(c, opts?.dead);
+
+		push(mkchains, `\tchain ${c.chain} {`);
+		if (j != null)
+			push(mkchains, `\t\t${c.members[j].stmt}`);
+		push(mkchains, '\t}');
+	}
+
 	let setup = join('\n', [
 		`destroy table ${TABLE}`,
 		`table ${TABLE} {`,
 		...sets,
+		...mkchains,
 		'\tchain prerouting {',
 		'\t\ttype filter hook prerouting priority mangle; policy accept;',
 		...restore, ...settled,
@@ -631,6 +738,7 @@ export function compile(policies, opts) {
 		'\t}',
 		'\tchain output {',
 		'\t\ttype route hook output priority mangle; policy accept;',
+		...guards,
 		...restore_out, ...settled_out,
 		...map(filter(rules4, (r) => r.out), (r) => r.text),
 		...map(filter(rules6, (r) => r.out), (r) => r.text),
@@ -639,8 +747,36 @@ export function compile(policies, opts) {
 		''
 	]);
 
-	return { setup, marks, issues, learn,
+	return { setup, marks, issues, learn, probes, chains,
 		fill: length(fill) ? join('\n', fill) + '\n' : '' };
+};
+
+// The mark chains in the state the dead devices call for, as one batch:
+// flushed and refilled together, so no new flow sees a chain half done.
+export function flip(chains, dead) {
+	let out = [];
+
+	for (let n in sort(keys(chains ?? {}))) {
+		let c = chains[n];
+		let j = active_member(c, dead);
+
+		push(out, sprintf('flush chain %s %s', TABLE, c.chain));
+		if (j != null)
+			push(out, sprintf('add rule %s %s %s', TABLE, c.chain, c.members[j].stmt));
+	}
+
+	return length(out) ? join('\n', out) + '\n' : '';
+};
+
+// Which interface each chained policy's new flows go to, as an index into
+// its interfaces, or null when none - for the status.
+export function active(chains, dead) {
+	let out = {};
+
+	for (let n in keys(chains ?? {}))
+		out[n] = active_member(chains[n], dead);
+
+	return out;
 };
 
 // A write may carry its own timeout - the TTL of the answer it came from,
