@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=qemu
 PKG_VERSION:=11.1.3
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://download.qemu.org/
 PKG_HASH:=5a8289c7940dc77d3873c81a6c29ba3afe1446fc9d36e77fa1658cdbecb84b22
@@ -276,6 +276,13 @@ config QEMU_ZSTD
 	bool "QEMU ZSTD compression support"
 	default n
 
+config QEMU_TPM
+	bool "QEMU TPM device support"
+	default n
+	help
+	  Build the TPM TIS/CRB guest devices and the passthrough and
+	  emulator (swtpm) backends.
+
 endif
 
 # Keep these options independent of the QEMU packages: their conditional
@@ -321,6 +328,7 @@ PKG_CONFIG_DEPENDS += \
 	CONFIG_QEMU_DEV_USB \
 	CONFIG_QEMU_SECCOMP \
 	CONFIG_QEMU_ZSTD \
+	CONFIG_QEMU_TPM \
 
 
 # QEMU configure script does not recognize these options
@@ -468,7 +476,7 @@ CONFIGURE_ARGS +=			\
 	--disable-sparse		\
 	--disable-strip			\
 	--disable-tcg-interpreter	\
-	--disable-tpm			\
+	--$(if $(CONFIG_QEMU_TPM),enable,disable)-tpm		\
 	--disable-usb-redir		\
 	--disable-vde			\
 	--disable-virtfs		\
