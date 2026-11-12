@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=catatonit
 PKG_VERSION:=0.2.1
-PKG_RELEASE:=1
+PKG_RELEASE:=4
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/openSUSE/catatonit/tar.gz/v$(PKG_VERSION)?
@@ -17,6 +17,11 @@ PKG_LICENSE:=GPL-2.0-or-later
 PKG_LICENSE_FILES:=COPYING
 
 include $(INCLUDE_DIR)/package.mk
+
+# Podman bind-mounts catatonit into the empty pod infra container, so it must
+# be static. The glibc toolchain's -static spec omits libgcc_eh, which makes
+# libtool's static probe fail and silently fall back to a dynamic link.
+CONFIGURE_VARS += $(if $(CONFIG_USE_GLIBC),LIBS="-lc -lgcc_eh")
 
 define Package/catatonit
   SECTION:=utils
