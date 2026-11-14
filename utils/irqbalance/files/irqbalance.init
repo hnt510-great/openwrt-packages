@@ -39,6 +39,13 @@ start_service() {
 	}
 	config_list_foreach irqbalance banirq handle_banirq_value
 
+	# Optional per-netdev CPU pools; each list entry is one daemon argument.
+	handle_netdev_cpus_value()
+	{
+		procd_append_param command --netdev-cpus "$1"
+	}
+	config_list_foreach irqbalance netdev_cpus handle_netdev_cpus_value
+
 	# debug
 	if [ "$debug" -gt 0 ]; then
 		procd_append_param command -d
