@@ -227,7 +227,8 @@ define Build/InstallDev
 		$(PKG_INSTALL_DIR)/usr/bin/python$(PYTHON3_VERSION)-config \
 		$(2)/bin/
 	$(SED) \
-		's|^prefix_real=.*$$$$|prefix_real="$(PYTHON3_DIR)"|' \
+		'/^prefix_real=.*{[[:space:]]*$$$$/,/^}[[:space:]]*$$$$/c\prefix_real="$(PYTHON3_DIR)"' \
+		-e 's|^prefix_real=.*$$$$|prefix_real="$(PYTHON3_DIR)"|' \
 		$(2)/bin/python$(PYTHON3_VERSION)-config
 endef
 
