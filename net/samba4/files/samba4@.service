@@ -1,0 +1,18 @@
+[Unit]
+Description=Samba %i daemon
+Requires=samba4.service
+After=samba4.service
+PartOf=samba4.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Slice=nas.slice
+ExecCondition=/usr/libexec/samba4-systemd condition %i
+ExecStart=/usr/libexec/samba4-systemd run %i
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=16384
+KillMode=control-group
+TimeoutStopSec=30s

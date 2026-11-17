@@ -1,0 +1,76 @@
+#!/bin/sh
+# Native lifecycle adapter and foreground exec; systemd supervises each daemon.
+. /lib/functions.sh
+. /usr/libexec/samba4-config.sh
+
+load_options() {
+	config_load samba4
+	config_foreach read_options samba
+}
+read_options() {
+	config_get_bool DISABLE_AD_DC "$1" disable_ad_dc 0
+	config_get_bool DISABLE_NETBIOS "$1" disable_netbios 0
+	config_get_bool DISABLE_WINBIND "$1" disable_winbind 0
+}
+match_interface() {
+	local interfaces net
+	config_get interfaces "$1" interface lan
+	for net in $interfaces; do
+		[ "$net" != "$requested_interface" ] || interface_selected=1
+	done
+}
+selected() {
+	load_options
+	if [ "$DISABLE_AD_DC" != 1 ] && [ -x /usr/sbin/samba ]; then
+		[ "$1" = samba ]
+	else
+		case "$1" in
+			smbd) return 0 ;;
+			nmbd) [ "$DISABLE_NETBIOS" != 1 ] && [ -x /usr/sbin/nmbd ] ;;
+			winbindd) [ "$DISABLE_WINBIND" != 1 ] && [ -x /usr/sbin/winbindd ] ;;
+			*) return 1 ;;
+		esac
+	fi
+}
+case "$1" in
+prepare)
+	SAMBA_CONFIG_OUTPUT=/var/etc/smb.conf.new.$$
+	trap 'rm -f "$SAMBA_CONFIG_OUTPUT"' EXIT
+	init_config
+	/usr/bin/testparm -s "$SAMBA_CONFIG_OUTPUT" >/dev/null || exit 1
+	if [ ! -L /etc/samba/smb.conf ]; then
+		/usr/bin/testparm -s /etc/samba/smb.conf >/dev/null || exit 1
+	fi
+	mv -f "$SAMBA_CONFIG_OUTPUT" /var/etc/smb.conf
+	;;
+condition) selected "$2" ;;
+interface)
+	requested_interface=$2
+	interface_selected=0
+	config_load samba4
+	config_foreach match_interface samba
+	[ "$interface_selected" = 1 ]
+	;;
+run)
+	case "$2" in smbd|nmbd|winbindd|samba) ;; *) exit 2 ;; esac
+	load_options
+	config_get nice_value extra samba_nice 0
+	case "$nice_value" in ''|*[!0-9-]*) exit 2 ;; esac
+	exec nice -n "$nice_value" /usr/sbin/"$2" -F --no-process-group
+	;;
+start|stop|restart|status) exec systemctl "$1" samba4.service ;;
+reload)
+	systemctl is-active --quiet samba4.service || exit 0
+	exec systemctl reload samba4.service
+	;;
+reconcile)
+	# Administrative configuration changes get a fresh start budget; automatic
+	# crash recovery still uses the instance's normal rate limit.
+	systemctl reset-failed samba4@smbd.service samba4@nmbd.service samba4@winbindd.service samba4@samba.service || exit 1
+	exec systemctl --no-block restart samba4@smbd.service samba4@nmbd.service samba4@winbindd.service samba4@samba.service
+	;;
+running) exec systemctl is-active --quiet samba4.service ;;
+enable|disable) exec systemctl "$1" samba4.service samba4-config.path ;;
+enabled) exec systemctl is-enabled --quiet samba4.service ;;
+*) exit 2 ;;
+esac
