@@ -1,0 +1,20 @@
+[Unit]
+Description=Avahi mDNS/DNS-SD Stack
+After=network-online.target
+Wants=network-online.target
+Before=samba4.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Slice=nas.slice
+ExecStart=/usr/sbin/avahi-daemon -s
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+KillMode=control-group
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

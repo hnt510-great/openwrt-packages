@@ -1,0 +1,14 @@
+[Unit]
+Description=Watch WSDD2 configuration inputs
+
+[Path]
+PathChanged=/var/etc/smb.conf
+PathChanged=/etc/samba/smb.conf
+PathChanged=/etc/ksmbd/ksmbd.conf
+PathChanged=/etc/config/system
+PathChanged=/etc/config/dhcp
+PathChanged=/etc/config/ksmbd
+Unit=wsdd2-reconfigure.service
+
+[Install]
+WantedBy=multi-user.target

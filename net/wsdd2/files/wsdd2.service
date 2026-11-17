@@ -1,0 +1,22 @@
+[Unit]
+Description=Web Services for Devices (WSD) daemon
+After=network-online.target samba4.service samba4@smbd.service samba4@samba.service
+Wants=network-online.target
+PartOf=samba4.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Slice=nas.slice
+ExecCondition=/usr/libexec/wsdd2-systemd condition
+ExecStart=/usr/libexec/wsdd2-systemd run
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+KillMode=control-group
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target samba4.service
+Also=wsdd2-config.path
