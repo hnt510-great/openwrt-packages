@@ -21,7 +21,6 @@ postinst)
 	for mask in /etc/systemd/system/sshd.service /run/systemd/system/sshd.service; do
 		[ "$(readlink "$mask" 2>/dev/null || :)" != /dev/null ] || exit 0
 	done
-	# Online upgrades stage a procd-to-systemd migration for an explicit reboot.
 	# try-restart preserves inactive/disabled units and cannot start a second owner.
 	if [ "${PKG_UPGRADE:-0}" != 1 ] &&
 	   [ "$(readlink /etc/systemd/system/sshd.service 2>/dev/null || :)" != /dev/null ]; then

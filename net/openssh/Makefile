@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=openssh
 PKG_REALVERSION:=10.6p2
 PKG_VERSION:=10.6_p2
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_REALVERSION).tar.gz
@@ -252,7 +252,7 @@ define Package/openssh-server/install
 	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/etc/ssh/sshd_config $(1)/etc/ssh/
 	sed -r -i 's,^#(HostKey /etc/ssh/ssh_host_(rsa|ed25519|mldsa44_ed25519)_key)$$$$,\1,' $(1)/etc/ssh/sshd_config
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/sshd.init $(1)/etc/init.d/sshd
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),sshd-native.init,sshd.init) $(1)/etc/init.d/sshd
 	$(INSTALL_DIR) $(1)/lib/preinit
 	$(INSTALL_BIN) ./files/sshd.failsafe $(1)/lib/preinit/99_10_failsafe_sshd
 	$(INSTALL_DIR) $(1)/usr/sbin

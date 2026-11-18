@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=dbus
 PKG_VERSION:=1.16.2
-PKG_RELEASE:=9
+PKG_RELEASE:=11
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=https://dbus.freedesktop.org/releases/dbus
@@ -146,7 +146,7 @@ define Package/dbus/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/libexec/dbus-daemon-launch-helper $(1)/usr/lib/
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/dbus.init $(1)/etc/init.d/dbus
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),dbus-native.init,dbus.init) $(1)/etc/init.d/dbus
 	$(INSTALL_DIR) $(1)/usr/share/dbus-1
 	$(CP) $(PKG_INSTALL_DIR)/usr/share/dbus-1 $(1)/usr/share/
 	$(if $(CONFIG_OPENWRT_SYSTEMD),$(SED) 's|/usr/libexec/dbus-daemon-launch-helper|/usr/lib/dbus-daemon-launch-helper|g' $(1)/usr/share/dbus-1/system.conf)

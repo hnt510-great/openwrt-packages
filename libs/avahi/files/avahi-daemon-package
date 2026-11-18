@@ -1,24 +1,11 @@
 #!/bin/sh
-# Package lifecycle only; never transfers a running listener out of procd.
 set -eu
 
 root=${IPKG_INSTROOT:-}
-stamp=/etc/systemd/openwrt-migrated/avahi-daemon
-
-rc_enabled() {
-	for link in "$1/etc/rc.d/S"[0-9][0-9]avahi-daemon; do
-		if [ -L "$link" ] || [ -x "$link" ]; then
-			return 0
-		fi
-	done
-	return 1
-}
-
 case "${1:-}" in
 postinst)
 	if [ -n "$root" ]; then
-		if [ "${PKG_UPGRADE:-0}" != 1 ] ||
-		   { [ ! -e "$root$stamp" ] && rc_enabled "$root"; }; then
+		if [ "${PKG_UPGRADE:-0}" != 1 ]; then
 			if [ "$(readlink "$root/etc/systemd/system/avahi-daemon.service" 2>/dev/null || :)" != /dev/null ]; then
 				wants=$root/etc/systemd/system/multi-user.target.wants
 				mkdir -p "$wants"
@@ -26,8 +13,6 @@ postinst)
 					ln -s /usr/lib/systemd/system/avahi-daemon.service "$wants/avahi-daemon.service"
 				fi
 			fi
-			mkdir -p "$root/etc/systemd/openwrt-migrated"
-			: >"$root$stamp"
 		fi
 		exit 0
 	fi
@@ -36,20 +21,18 @@ postinst)
 	for mask in /etc/systemd/system/avahi-daemon.service /run/systemd/system/avahi-daemon.service; do
 		[ "$(readlink "$mask" 2>/dev/null || :)" != /dev/null ] || exit 0
 	done
-	if [ "${PKG_UPGRADE:-0}" != 1 ] ||
-	   { [ ! -e "$stamp" ] && rc_enabled ""; }; then
+	if [ "${PKG_UPGRADE:-0}" != 1 ]; then
 		systemctl enable avahi-daemon.service
+		systemctl --no-block start avahi-daemon.service
+	else
+		systemctl try-restart avahi-daemon.service
 	fi
-	mkdir -p /etc/systemd/openwrt-migrated
-	: >"$stamp"
-	systemctl try-restart avahi-daemon.service
 	;;
 prerm)
 	[ -z "$root" ] && [ -d /run/systemd/system ] || exit 0
 	[ "${PKG_UPGRADE:-0}" != 1 ] || exit 0
 	systemctl stop avahi-daemon.service
 	systemctl disable avahi-daemon.service
-	rm -f "$stamp"
 	;;
 *)
 	exit 2

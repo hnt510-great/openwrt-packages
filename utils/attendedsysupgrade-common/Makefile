@@ -13,7 +13,7 @@ define Package/attendedsysupgrade-common
   CATEGORY:=Base system
   TITLE:=Common files needed by attendedsysupgrade packages
   MAINTAINER:=Paul Spooren <mail@aparcar.org>
-  DEPENDS:=+rpcd +rpcd-mod-rpcsys
+  DEPENDS:=@!OPENWRT_SYSTEMD +rpcd +rpcd-mod-rpcsys
   PKGARCH:=all
 endef
 

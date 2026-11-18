@@ -1,25 +1,12 @@
 #!/bin/sh
-# Package lifecycle only; never transfers a running listener out of procd.
 set -eu
 
 root=${IPKG_INSTROOT:-}
-stamp=/etc/systemd/openwrt-migrated/samba4
-
-rc_enabled() {
-	for link in "$1/etc/rc.d/S"[0-9][0-9]samba4; do
-		if [ -L "$link" ] || [ -x "$link" ]; then
-			return 0
-		fi
-	done
-	return 1
-}
-
 case "${1:-}" in
 postinst)
 	if [ -n "$root" ]; then
 		# Offline image assembly must not contact the host's service manager.
-		if [ "${PKG_UPGRADE:-0}" != 1 ] ||
-		   { [ ! -e "$root$stamp" ] && rc_enabled "$root"; }; then
+		if [ "${PKG_UPGRADE:-0}" != 1 ]; then
 			if [ "$(readlink "$root/etc/systemd/system/samba4.service" 2>/dev/null || :)" != /dev/null ]; then
 				wants=$root/etc/systemd/system/multi-user.target.wants
 				mkdir -p "$wants"
@@ -30,8 +17,6 @@ postinst)
 					ln -s /usr/lib/systemd/system/samba4-config.path "$wants/samba4-config.path"
 				fi
 			fi
-			mkdir -p "$root/etc/systemd/openwrt-migrated"
-			: >"$root$stamp"
 		fi
 		exit 0
 	fi
@@ -40,22 +25,18 @@ postinst)
 	for mask in /etc/systemd/system/samba4.service /run/systemd/system/samba4.service; do
 		[ "$(readlink "$mask" 2>/dev/null || :)" != /dev/null ] || exit 0
 	done
-	# Online upgrades stage a procd-to-systemd migration for an explicit reboot.
-	# try-restart preserves inactive/disabled units and cannot start a second owner.
-	if [ "${PKG_UPGRADE:-0}" != 1 ] ||
-	   { [ ! -e "$stamp" ] && rc_enabled ""; }; then
+	if [ "${PKG_UPGRADE:-0}" != 1 ]; then
 		systemctl enable samba4.service samba4-config.path
+		systemctl --no-block start samba4.service
+	else
+		systemctl try-restart samba4.service
 	fi
-	mkdir -p /etc/systemd/openwrt-migrated
-	: >"$stamp"
-	systemctl try-restart samba4.service
 	;;
 prerm)
 	[ -z "$root" ] && [ -d /run/systemd/system ] || exit 0
 	[ "${PKG_UPGRADE:-0}" != 1 ] || exit 0
 	systemctl stop samba4-config.path samba4-reconfigure.service samba4.service
 	systemctl disable samba4.service samba4-config.path
-	rm -f "$stamp"
 	;;
 *) exit 2 ;;
 esac

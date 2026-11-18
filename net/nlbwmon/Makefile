@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nlbwmon
-PKG_RELEASE:=7
+PKG_RELEASE:=8
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/jow-/nlbwmon.git
@@ -38,7 +38,7 @@ define Package/nlbwmon/install
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/protocols.txt $(1)/usr/share/nlbwmon/protocols
 	$(INSTALL_DIR) $(1)/usr/libexec $(1)/etc/init.d
 	$(INSTALL_DATA) ./files/nlbwmon-config.sh $(1)/usr/libexec/nlbwmon-config.sh
-	$(INSTALL_BIN) ./files/nlbwmon.init $(1)/etc/init.d/nlbwmon
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),nlbwmon-native.init,nlbwmon.init) $(1)/etc/init.d/nlbwmon
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/nlbwmon.config $(1)/etc/config/nlbwmon
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface

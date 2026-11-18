@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=wsdd2
-PKG_RELEASE:=6
+PKG_RELEASE:=7
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/Netgear/wsdd2.git
@@ -41,7 +41,7 @@ define Package/wsdd2/install
 	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/libexec $(1)/etc/init.d
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wsdd2 $(1)/usr/bin/
 	$(INSTALL_DATA) ./files/wsdd2-config.sh $(1)/usr/libexec/wsdd2-config.sh
-	$(INSTALL_BIN) ./files/wsdd2.init $(1)/etc/init.d/wsdd2
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),wsdd2-native.init,wsdd2.init) $(1)/etc/init.d/wsdd2
 	$(if $(CONFIG_OPENWRT_SYSTEMD),$(call Package/wsdd2/install-systemd,$(1)))
 endef
 

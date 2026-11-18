@@ -1,0 +1,18 @@
+#!/bin/sh
+# OpenWrt native service adapter
+case "$1" in
+	boot|stop|shutdown|depends) exit 0 ;;
+esac
+if [ -n "${IPKG_INSTROOT:-}" ]; then
+	case "$1" in
+		enabled) exec systemctl --root="$IPKG_INSTROOT" is-enabled dbus.service ;;
+		enable|disable) exec systemctl --root="$IPKG_INSTROOT" "$1" dbus.service ;;
+		*) exit 0 ;;
+	esac
+fi
+case "$1" in
+	start|restart|reload) exec /usr/bin/systemctl start dbus.service ;;
+	enabled) set -- is-enabled ;;
+	running) set -- is-active ;;
+esac
+exec /usr/bin/systemctl "$1" dbus.service

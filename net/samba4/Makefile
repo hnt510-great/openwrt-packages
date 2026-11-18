@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=samba
 PKG_VERSION:=4.24.5
-PKG_RELEASE:=10
+PKG_RELEASE:=11
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:= \
@@ -478,7 +478,7 @@ endif
 	$(INSTALL_DIR) $(1)/etc/config $(1)/etc/samba $(1)/etc/init.d
 	$(INSTALL_CONF) ./files/samba.config $(1)/etc/config/samba4
 	$(INSTALL_DATA) ./files/smb.conf.template $(1)/etc/samba
-	$(INSTALL_BIN) ./files/samba.init $(1)/etc/init.d/samba4
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),samba4-native.init,samba.init) $(1)/etc/init.d/samba4
 	$(INSTALL_DIR) $(1)/usr/libexec
 	$(INSTALL_DATA) ./files/samba-config.sh $(1)/usr/libexec/samba4-config.sh
 	$(if $(CONFIG_OPENWRT_SYSTEMD),$(call Package/samba4-server/install-systemd,$(1)))
