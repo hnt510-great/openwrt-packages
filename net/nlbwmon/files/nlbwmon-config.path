@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch nlbwmon configuration inputs
+
+[Path]
+PathChanged=/etc/config/nlbwmon
+PathChanged=/etc/config/dhcp
+PathChanged=/etc/config/system
+Unit=nlbwmon-reconfigure.service
+
+[Install]
+WantedBy=multi-user.target
