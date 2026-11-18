@@ -1,0 +1,47 @@
+#!/bin/sh
+set -eu
+
+root=${IPKG_INSTROOT:-}
+case "${1:-}" in
+postinst)
+	if [ -n "$root" ]; then
+		if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+			if [ "$(readlink "$root/etc/systemd/system/wsdd2.service" 2>/dev/null || :)" != /dev/null ]; then
+				wants=$root/etc/systemd/system/multi-user.target.wants
+				samba_wants=$root/etc/systemd/system/samba4.service.wants
+				mkdir -p "$wants" "$samba_wants"
+				if [ ! -e "$wants/wsdd2.service" ] && [ ! -L "$wants/wsdd2.service" ]; then
+					ln -s /usr/lib/systemd/system/wsdd2.service "$wants/wsdd2.service"
+				fi
+				if [ ! -e "$wants/wsdd2-config.path" ] && [ ! -L "$wants/wsdd2-config.path" ]; then
+					ln -s /usr/lib/systemd/system/wsdd2-config.path "$wants/wsdd2-config.path"
+				fi
+				if [ ! -e "$samba_wants/wsdd2.service" ] && [ ! -L "$samba_wants/wsdd2.service" ]; then
+					ln -s /usr/lib/systemd/system/wsdd2.service "$samba_wants/wsdd2.service"
+				fi
+			fi
+		fi
+		exit 0
+	fi
+	[ -d /run/systemd/system ] || exit 0
+	systemctl daemon-reload
+	for mask in /etc/systemd/system/wsdd2.service /run/systemd/system/wsdd2.service; do
+		[ "$(readlink "$mask" 2>/dev/null || :)" != /dev/null ] || exit 0
+	done
+	if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+		systemctl enable wsdd2.service wsdd2-config.path
+		systemctl --no-block start wsdd2.service
+	else
+		systemctl try-restart wsdd2.service
+	fi
+	;;
+prerm)
+	[ -z "$root" ] && [ -d /run/systemd/system ] || exit 0
+	[ "${PKG_UPGRADE:-0}" != 1 ] || exit 0
+	systemctl stop wsdd2-config.path wsdd2-reconfigure.service wsdd2.service
+	systemctl disable wsdd2.service wsdd2-config.path
+	;;
+*)
+	exit 2
+	;;
+esac

@@ -1,0 +1,40 @@
+#!/bin/sh
+set -eu
+
+root=${IPKG_INSTROOT:-}
+case "${1:-}" in
+postinst)
+	if [ -n "$root" ]; then
+		if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+			if [ "$(readlink "$root/etc/systemd/system/avahi-daemon.service" 2>/dev/null || :)" != /dev/null ]; then
+				wants=$root/etc/systemd/system/multi-user.target.wants
+				mkdir -p "$wants"
+				if [ ! -e "$wants/avahi-daemon.service" ] && [ ! -L "$wants/avahi-daemon.service" ]; then
+					ln -s /usr/lib/systemd/system/avahi-daemon.service "$wants/avahi-daemon.service"
+				fi
+			fi
+		fi
+		exit 0
+	fi
+	[ -d /run/systemd/system ] || exit 0
+	systemctl daemon-reload
+	for mask in /etc/systemd/system/avahi-daemon.service /run/systemd/system/avahi-daemon.service; do
+		[ "$(readlink "$mask" 2>/dev/null || :)" != /dev/null ] || exit 0
+	done
+	if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+		systemctl enable avahi-daemon.service
+		systemctl --no-block start avahi-daemon.service
+	else
+		systemctl try-restart avahi-daemon.service
+	fi
+	;;
+prerm)
+	[ -z "$root" ] && [ -d /run/systemd/system ] || exit 0
+	[ "${PKG_UPGRADE:-0}" != 1 ] || exit 0
+	systemctl stop avahi-daemon.service
+	systemctl disable avahi-daemon.service
+	;;
+*)
+	exit 2
+	;;
+esac

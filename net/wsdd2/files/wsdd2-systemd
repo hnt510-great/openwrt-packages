@@ -1,0 +1,53 @@
+#!/bin/sh
+# Native lifecycle adapter and foreground exec; systemd supervises wsdd2.
+. /usr/libexec/wsdd2-config.sh
+
+case "$1" in
+condition)
+	if wsdd2_find_conf; then
+		exit 0
+	fi
+	logger -p daemon.info -t 'wsdd2' "samba36/4 or ksmbd is not running"
+	exit 1
+	;;
+run)
+	wsdd2_find_conf || {
+		logger -p daemon.info -t 'wsdd2' "samba36/4 or ksmbd is not running"
+		exit 1
+	}
+	wsdd2_resolve_params
+	set -- /usr/bin/wsdd2
+	[ -n "$WS_IFNAME" ] && set -- "$@" -i "$WS_IFNAME"
+	set -- "$@" -N "$WS_NB" -G "$WS_WG"
+	[ -z "$WS_BI" ] || set -- "$@" -b "$WS_BI"
+	exec "$@"
+	;;
+start|stop|restart|status)
+	exec systemctl "$1" wsdd2.service
+	;;
+reload)
+	systemctl is-active --quiet wsdd2.service || exit 0
+	systemctl reset-failed wsdd2.service || exit 1
+	exec systemctl restart wsdd2.service
+	;;
+reconcile)
+	systemctl is-active --quiet wsdd2.service || exit 0
+	if wsdd2_find_conf; then
+		systemctl reset-failed wsdd2.service || exit 1
+		exec systemctl --no-block restart wsdd2.service
+	fi
+	exec systemctl --no-block stop wsdd2.service
+	;;
+running)
+	exec systemctl is-active --quiet wsdd2.service
+	;;
+enable|disable)
+	exec systemctl "$1" wsdd2.service wsdd2-config.path
+	;;
+enabled)
+	exec systemctl is-enabled --quiet wsdd2.service
+	;;
+*)
+	exit 2
+	;;
+esac

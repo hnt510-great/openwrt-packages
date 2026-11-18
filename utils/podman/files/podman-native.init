@@ -1,0 +1,17 @@
+#!/bin/sh
+# OpenWrt native service adapter
+case "$1" in
+	boot|shutdown|depends) exit 0 ;;
+esac
+if [ -n "${IPKG_INSTROOT:-}" ]; then
+	case "$1" in
+		enabled) exec systemctl --root="$IPKG_INSTROOT" is-enabled podman.socket ;;
+		enable|disable) exec systemctl --root="$IPKG_INSTROOT" "$1" podman.socket ;;
+		*) exit 0 ;;
+	esac
+fi
+case "$1" in
+	enabled) set -- is-enabled ;;
+	running) set -- is-active ;;
+esac
+exec /usr/bin/systemctl "$1" podman.socket

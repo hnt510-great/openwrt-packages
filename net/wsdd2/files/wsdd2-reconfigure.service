@@ -1,0 +1,10 @@
+[Unit]
+Description=Apply changed WSDD2 configuration
+After=network-online.target
+# File edits must not permanently disable the path watcher.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+Slice=nas.slice
+ExecStart=/usr/libexec/wsdd2-systemd reconcile

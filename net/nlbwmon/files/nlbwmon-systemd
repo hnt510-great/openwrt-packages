@@ -1,0 +1,34 @@
+#!/bin/sh
+# Native lifecycle adapter and foreground exec; systemd supervises nlbwmon.
+. /usr/libexec/nlbwmon-config.sh
+
+case "$1" in
+run)
+	nlbwmon_resolve_args
+	# shellcheck disable=SC2086
+	exec /usr/sbin/nlbwmon $NLBWMON_ARGS
+	;;
+interface)
+	nlbwmon_interface_selected "$2"
+	;;
+start|stop|restart|status)
+	exec systemctl "$1" nlbwmon.service
+	;;
+reload|reconcile)
+	systemctl is-active --quiet nlbwmon.service || exit 0
+	systemctl reset-failed nlbwmon.service || exit 1
+	exec systemctl --no-block restart nlbwmon.service
+	;;
+running)
+	exec systemctl is-active --quiet nlbwmon.service
+	;;
+enable|disable)
+	exec systemctl "$1" nlbwmon.service nlbwmon-config.path
+	;;
+enabled)
+	exec systemctl is-enabled --quiet nlbwmon.service
+	;;
+*)
+	exit 2
+	;;
+esac

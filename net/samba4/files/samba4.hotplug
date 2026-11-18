@@ -1,0 +1,8 @@
+#!/bin/sh
+[ -d /run/systemd/system ] && [ -f /usr/lib/systemd/system/samba4.service ] || exit 0
+case "$ACTION" in
+	ifup|ifdown|ifupdate)
+		/usr/libexec/samba4-systemd interface "$INTERFACE" || exit 0
+		systemctl --no-block start samba4-reconfigure.service
+		;;
+esac

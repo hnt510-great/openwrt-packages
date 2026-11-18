@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch Samba configuration inputs
+
+[Path]
+PathChanged=/etc/config/samba4
+PathChanged=/etc/config/system
+PathChanged=/etc/config/dhcp
+PathChanged=/etc/samba/smb.conf.template
+Unit=samba4-reconfigure.service
+
+[Install]
+WantedBy=multi-user.target

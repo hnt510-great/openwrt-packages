@@ -1,0 +1,16 @@
+[Unit]
+Description=Samba configuration and daemon group
+After=network-online.target
+Wants=network-online.target samba4-config.path samba4@smbd.service samba4@nmbd.service samba4@winbindd.service samba4@samba.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Slice=nas.slice
+ExecStart=/usr/libexec/samba4-systemd prepare
+ExecReload=/usr/libexec/samba4-systemd prepare
+ExecReload=/usr/libexec/samba4-systemd reconcile
+
+[Install]
+WantedBy=multi-user.target
+Also=samba4-config.path

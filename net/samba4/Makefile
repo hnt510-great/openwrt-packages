@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=samba
 PKG_VERSION:=4.24.5
-PKG_RELEASE:=5
+PKG_RELEASE:=11
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:= \
@@ -24,6 +24,7 @@ HOST_BUILD_DEPENDS:=python3/host rpcsvc-proto/host perl/host perl-parse-yapp/hos
 PKG_BUILD_DEPENDS:=samba4/host libtasn1/host perl/host
 
 PKG_CONFIG_DEPENDS:= \
+	CONFIG_OPENWRT_SYSTEMD \
 	CONFIG_SAMBA4_SERVER_NETBIOS \
 	CONFIG_SAMBA4_SERVER_AVAHI \
 	CONFIG_SAMBA4_SERVER_QUOTAS \
@@ -477,7 +478,27 @@ endif
 	$(INSTALL_DIR) $(1)/etc/config $(1)/etc/samba $(1)/etc/init.d
 	$(INSTALL_CONF) ./files/samba.config $(1)/etc/config/samba4
 	$(INSTALL_DATA) ./files/smb.conf.template $(1)/etc/samba
-	$(INSTALL_BIN) ./files/samba.init $(1)/etc/init.d/samba4
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),samba4-native.init,samba.init) $(1)/etc/init.d/samba4
+	$(INSTALL_DIR) $(1)/usr/libexec
+	$(INSTALL_DATA) ./files/samba-config.sh $(1)/usr/libexec/samba4-config.sh
+	$(if $(CONFIG_OPENWRT_SYSTEMD),$(call Package/samba4-server/install-systemd,$(1)))
+endef
+
+define Package/samba4-server/install-systemd
+	$(INSTALL_DIR) $(1)/usr/lib/systemd/system $(1)/usr/libexec $(1)/etc/hotplug.d/iface
+	$(INSTALL_DATA) ./files/*.service ./files/*.path ./files/nas.slice $(1)/usr/lib/systemd/system/
+	$(INSTALL_BIN) ./files/samba4-systemd ./files/samba4-package $(1)/usr/libexec/
+	$(INSTALL_DATA) ./files/samba4.hotplug $(1)/etc/hotplug.d/iface/60-samba4
+endef
+
+define Package/samba4-server/postinst
+#!/bin/sh
+[ ! -x "$${IPKG_INSTROOT}/usr/libexec/samba4-package" ] || "$${IPKG_INSTROOT}/usr/libexec/samba4-package" postinst
+endef
+
+define Package/samba4-server/prerm
+#!/bin/sh
+[ ! -x "$${IPKG_INSTROOT}/usr/libexec/samba4-package" ] || "$${IPKG_INSTROOT}/usr/libexec/samba4-package" prerm
 endef
 
 define Package/samba4-server/conffiles

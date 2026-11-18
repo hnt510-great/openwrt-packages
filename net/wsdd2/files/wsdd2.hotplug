@@ -1,0 +1,9 @@
+#!/bin/sh
+[ -d /run/systemd/system ] && [ -f /usr/lib/systemd/system/wsdd2.service ] || exit 0
+case "$ACTION" in
+	ifup|ifdown|ifupdate)
+		[ "$INTERFACE" = lan ] || exit 0
+		systemctl is-active --quiet wsdd2.service || exit 0
+		systemctl --no-block start wsdd2-reconfigure.service
+		;;
+esac

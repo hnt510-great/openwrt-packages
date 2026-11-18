@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+root=${IPKG_INSTROOT:-}
+case "${1:-}" in
+postinst)
+	if [ -n "$root" ]; then
+		if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+			if [ "$(readlink "$root/etc/systemd/system/nlbwmon.service" 2>/dev/null || :)" != /dev/null ]; then
+				wants=$root/etc/systemd/system/multi-user.target.wants
+				mkdir -p "$wants"
+				if [ ! -e "$wants/nlbwmon.service" ] && [ ! -L "$wants/nlbwmon.service" ]; then
+					ln -s /usr/lib/systemd/system/nlbwmon.service "$wants/nlbwmon.service"
+				fi
+				if [ ! -e "$wants/nlbwmon-config.path" ] && [ ! -L "$wants/nlbwmon-config.path" ]; then
+					ln -s /usr/lib/systemd/system/nlbwmon-config.path "$wants/nlbwmon-config.path"
+				fi
+			fi
+		fi
+		exit 0
+	fi
+	[ -d /run/systemd/system ] || exit 0
+	systemctl daemon-reload
+	for mask in /etc/systemd/system/nlbwmon.service /run/systemd/system/nlbwmon.service; do
+		[ "$(readlink "$mask" 2>/dev/null || :)" != /dev/null ] || exit 0
+	done
+	if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+		systemctl enable nlbwmon.service nlbwmon-config.path
+		systemctl --no-block start nlbwmon.service
+	else
+		systemctl try-restart nlbwmon.service
+	fi
+	;;
+prerm)
+	[ -z "$root" ] && [ -d /run/systemd/system ] || exit 0
+	[ "${PKG_UPGRADE:-0}" != 1 ] || exit 0
+	systemctl stop nlbwmon-config.path nlbwmon-reconfigure.service nlbwmon.service
+	systemctl disable nlbwmon.service nlbwmon-config.path
+	;;
+*)
+	exit 2
+	;;
+esac

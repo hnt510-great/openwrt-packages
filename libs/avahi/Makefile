@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=avahi
 PKG_VERSION:=0.9_rc5
-PKG_RELEASE:=1
+PKG_RELEASE:=6
 
 PKG_SOURCE:=$(PKG_NAME)-0.9-rc5.tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/avahi/avahi/tar.gz/v0.9-rc5?
@@ -24,6 +24,8 @@ PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
+
+PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 define Package/avahi/Default
   SECTION:=net
@@ -347,8 +349,29 @@ define Package/avahi-daemon/install
 	# to place custom service files
 	$(INSTALL_DIR) $(1)/etc/avahi/services
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/avahi-daemon.init $(1)/etc/init.d/avahi-daemon
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),avahi-daemon-native.init,avahi-daemon.init) $(1)/etc/init.d/avahi-daemon
+	$(if $(CONFIG_OPENWRT_SYSTEMD),$(call Package/avahi-daemon/install-systemd,$(1)))
 endef
+
+define Package/avahi-daemon/install-systemd
+	$(INSTALL_DIR) $(1)/usr/lib/systemd/system $(1)/usr/libexec
+	$(INSTALL_DATA) $(if $(filter nodbus,$(BUILD_VARIANT)),./files/avahi-daemon-nodbus.service,./files/avahi-daemon.service) \
+		$(1)/usr/lib/systemd/system/avahi-daemon.service
+	$(INSTALL_BIN) ./files/avahi-daemon-systemd ./files/avahi-daemon-package $(1)/usr/libexec/
+endef
+
+define Package/avahi-dbus-daemon/postinst
+#!/bin/sh
+[ ! -x "$${IPKG_INSTROOT}/usr/libexec/avahi-daemon-package" ] || "$${IPKG_INSTROOT}/usr/libexec/avahi-daemon-package" postinst
+endef
+
+define Package/avahi-dbus-daemon/prerm
+#!/bin/sh
+[ ! -x "$${IPKG_INSTROOT}/usr/libexec/avahi-daemon-package" ] || "$${IPKG_INSTROOT}/usr/libexec/avahi-daemon-package" prerm
+endef
+
+Package/avahi-nodbus-daemon/postinst=$(Package/avahi-dbus-daemon/postinst)
+Package/avahi-nodbus-daemon/prerm=$(Package/avahi-dbus-daemon/prerm)
 
 Package/avahi-dbus-daemon/install=$(Package/avahi-daemon/install)
 Package/avahi-nodbus-daemon/install=$(Package/avahi-daemon/install)

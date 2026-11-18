@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+root=${IPKG_INSTROOT:-}
+case "${1:-}" in
+postinst)
+	if [ -n "$root" ]; then
+		# Offline image assembly must not contact the host's service manager.
+		if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+			if [ "$(readlink "$root/etc/systemd/system/samba4.service" 2>/dev/null || :)" != /dev/null ]; then
+				wants=$root/etc/systemd/system/multi-user.target.wants
+				mkdir -p "$wants"
+				if [ ! -e "$wants/samba4.service" ] && [ ! -L "$wants/samba4.service" ]; then
+					ln -s /usr/lib/systemd/system/samba4.service "$wants/samba4.service"
+				fi
+				if [ ! -e "$wants/samba4-config.path" ] && [ ! -L "$wants/samba4-config.path" ]; then
+					ln -s /usr/lib/systemd/system/samba4-config.path "$wants/samba4-config.path"
+				fi
+			fi
+		fi
+		exit 0
+	fi
+	[ -d /run/systemd/system ] || exit 0
+	systemctl daemon-reload
+	for mask in /etc/systemd/system/samba4.service /run/systemd/system/samba4.service; do
+		[ "$(readlink "$mask" 2>/dev/null || :)" != /dev/null ] || exit 0
+	done
+	if [ "${PKG_UPGRADE:-0}" != 1 ]; then
+		systemctl enable samba4.service samba4-config.path
+		systemctl --no-block start samba4.service
+	else
+		systemctl try-restart samba4.service
+	fi
+	;;
+prerm)
+	[ -z "$root" ] && [ -d /run/systemd/system ] || exit 0
+	[ "${PKG_UPGRADE:-0}" != 1 ] || exit 0
+	systemctl stop samba4-config.path samba4-reconfigure.service samba4.service
+	systemctl disable samba4.service samba4-config.path
+	;;
+*) exit 2 ;;
+esac

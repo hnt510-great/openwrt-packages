@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nlbwmon
-PKG_RELEASE:=2
+PKG_RELEASE:=8
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/jow-/nlbwmon.git
@@ -17,6 +17,8 @@ PKG_LICENSE_FILES:=COPYING
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
+
+PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
 
 CMAKE_OPTIONS += -DLIBNL_LIBRARY_TINY=ON
 TARGET_CFLAGS += -I$(STAGING_DIR)/usr/include/libnl-tiny
@@ -34,12 +36,31 @@ define Package/nlbwmon/install
 	$(LN) nlbwmon $(1)/usr/sbin/nlbw
 	$(INSTALL_DIR) $(1)/usr/share/nlbwmon
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/protocols.txt $(1)/usr/share/nlbwmon/protocols
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/nlbwmon.init $(1)/etc/init.d/nlbwmon
+	$(INSTALL_DIR) $(1)/usr/libexec $(1)/etc/init.d
+	$(INSTALL_DATA) ./files/nlbwmon-config.sh $(1)/usr/libexec/nlbwmon-config.sh
+	$(INSTALL_BIN) ./files/$(if $(CONFIG_OPENWRT_SYSTEMD),nlbwmon-native.init,nlbwmon.init) $(1)/etc/init.d/nlbwmon
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/nlbwmon.config $(1)/etc/config/nlbwmon
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
 	$(INSTALL_BIN) ./files/nlbwmon.hotplug $(1)/etc/hotplug.d/iface/30-nlbwmon
+	$(if $(CONFIG_OPENWRT_SYSTEMD),$(call Package/nlbwmon/install-systemd,$(1)))
+endef
+
+define Package/nlbwmon/install-systemd
+	$(INSTALL_DIR) $(1)/usr/lib/systemd/system $(1)/usr/libexec
+	$(INSTALL_DATA) ./files/nlbwmon.service ./files/nlbwmon-config.path \
+		./files/nlbwmon-reconfigure.service $(1)/usr/lib/systemd/system/
+	$(INSTALL_BIN) ./files/nlbwmon-systemd ./files/nlbwmon-package $(1)/usr/libexec/
+endef
+
+define Package/nlbwmon/postinst
+#!/bin/sh
+[ ! -x "$${IPKG_INSTROOT}/usr/libexec/nlbwmon-package" ] || "$${IPKG_INSTROOT}/usr/libexec/nlbwmon-package" postinst
+endef
+
+define Package/nlbwmon/prerm
+#!/bin/sh
+[ ! -x "$${IPKG_INSTROOT}/usr/libexec/nlbwmon-package" ] || "$${IPKG_INSTROOT}/usr/libexec/nlbwmon-package" prerm
 endef
 
 define Package/nlbwmon/conffiles
