@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=m4
 PKG_VERSION:=1.4.19
-PKG_RELEASE:=1
+PKG_RELEASE:=4
 
 PKG_SOURCE_URL:=@GNU/m4
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
@@ -21,6 +21,8 @@ PKG_LICENSE_FILES:=AUTHORS COPYING
 PKG_CPE_ID:=cpe:/a:gnu:m4
 
 PKG_INSTALL:=1
+
+TARGET_CFLAGS += -std=gnu17
 
 include $(INCLUDE_DIR)/package.mk
 
