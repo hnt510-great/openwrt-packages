@@ -53,7 +53,7 @@ define Package/libwebsockets/Default
   SECTION:=libs
   CATEGORY:=Libraries
   TITLE:=libwebsockets
-  ABI_VERSION:=23
+  # Unversioned libwebsockets-evlib_{uloop,uv}.so plugins prevent parallel ABI co-installation.
   DEPENDS:=+zlib +libcap +libubox
   URL:=https://libwebsockets.org
   MAINTAINER:=Karl Palsson <karlp@etactica.com>
