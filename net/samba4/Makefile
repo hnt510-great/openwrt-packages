@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=samba
 PKG_VERSION:=4.24.5
-PKG_RELEASE:=13
+PKG_RELEASE:=14
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:= \
@@ -422,6 +422,15 @@ endef
 
 # No default install see above
 define Build/Install
+endef
+
+define Build/InstallDev
+	$(INSTALL_DIR) $(1)/usr/include $(1)/usr/lib/pkgconfig
+	$(CP) $(PKG_INSTALL_DIR)/usr/include/samba-4.0 $(1)/usr/include/
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/*.so* $(1)/usr/lib/
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/samba $(1)/usr/lib/
+	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/*.pc $(1)/usr/lib/pkgconfig/
+	$(SED) 's|-Wl,-rpath,/usr/lib ||g' $(1)/usr/lib/pkgconfig/*.pc
 endef
 
 define Package/samba4-libs/install
