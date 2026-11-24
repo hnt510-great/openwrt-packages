@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=avahi
 PKG_VERSION:=0.9_rc5
-PKG_RELEASE:=6
+PKG_RELEASE:=8
 
 PKG_SOURCE:=$(PKG_NAME)-0.9-rc5.tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/avahi/avahi/tar.gz/v0.9-rc5?
@@ -25,7 +25,7 @@ PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
 
-PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD
+PKG_CONFIG_DEPENDS:=CONFIG_OPENWRT_SYSTEMD CONFIG_PACKAGE_libavahi-glib
 
 define Package/avahi/Default
   SECTION:=net
@@ -225,6 +225,22 @@ $(call Package/avahi/Default/description)
  For more information please see the avahi documentation.
 endef
 
+define Package/libavahi-glib
+  $(call Package/avahi/Default)
+  SECTION:=libs
+  CATEGORY:=Libraries
+  VARIANT:=dbus
+  DEPENDS:=+libavahi-dbus-support +glib2
+  TITLE+= (libavahi-glib library)
+  CONFLICTS:=libavahi-nodbus-support
+endef
+
+define Package/libavahi-glib/description
+$(call Package/avahi/Default/description)
+ .
+ This package adds the libavahi-glib library for GLib mainloop integration.
+endef
+
 define Package/avahi-utils
   $(call Package/avahi/Default)
   SUBMENU:=IP Addresses and Names
@@ -248,7 +264,6 @@ TARGET_CFLAGS += $(FPIC) -DGETTEXT_PACKAGE
 CONFIGURE_ARGS += \
 	--enable-shared \
 	--enable-static \
-	--disable-glib \
 	--disable-gobject \
 	--disable-introspection \
 	--disable-qt3 \
@@ -289,10 +304,12 @@ CONFIGURE_ARGS += \
 
 ifeq ($(BUILD_VARIANT),dbus)
 CONFIGURE_ARGS += \
-	--enable-dbus
+	--enable-dbus \
+	$(if $(CONFIG_PACKAGE_libavahi-glib),--enable-glib,--disable-glib)
 else
 CONFIGURE_ARGS += \
-	--disable-dbus
+	--disable-dbus \
+	--disable-glib
 endif
 
 CONFIGURE_VARS+= \
@@ -324,6 +341,11 @@ Package/libavahi-nodbus-support/install=$(Package/libavahi/install)
 define Package/libavahi-client/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libavahi-client.so.* $(1)/usr/lib/
+endef
+
+define Package/libavahi-glib/install
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libavahi-glib.so.* $(1)/usr/lib/
 endef
 
 define Package/avahi-utils/install
@@ -394,6 +416,7 @@ define Package/avahi-dnsconfd/install
 endef
 
 $(eval $(call BuildPackage,libavahi-client))
+$(eval $(call BuildPackage,libavahi-glib))
 $(eval $(call BuildPackage,avahi-utils))
 $(eval $(call BuildPackage,libavahi-dbus-support))
 $(eval $(call BuildPackage,libavahi-nodbus-support))
